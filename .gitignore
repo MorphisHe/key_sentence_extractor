@@ -6,4 +6,4 @@ out.txt
 *.docx
 test.py
 *.model
-.DS_Store/
+.DS_Store
