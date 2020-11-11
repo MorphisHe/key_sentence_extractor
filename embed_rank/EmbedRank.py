@@ -293,7 +293,6 @@ class EmbedRank:
         # TODO: will skipping some ckp_token cause bug?
         new_ckps_list = []
         ckps_embed = {}
-        sent_index = 0
         if mode == 'infer_mode':
             for sent_index in range(len(ckps_list)):
                 sent_token = ckps_list[sent_index]
