@@ -1,0 +1,9 @@
+env/
+__pycache__/
+.vscode/
+out.txt
+*.pdf
+*.docx
+test.py
+*.model
+.DS_Store/
