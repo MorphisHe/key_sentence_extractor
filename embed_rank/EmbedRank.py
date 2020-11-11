@@ -332,13 +332,13 @@ class EmbedRank:
         ---------------
         selected_ckp_strings: 1d np array containing ckp string of the selected ckps
 
-        selected_ckp: 1d no array containing index of selected ckp
+        selected_sent_index: list that contains the index of sentence for selected ckps (in ranked order)
         '''
         # get the vector of doc and ckps
         doc_vec = doc_embed[1].reshape(1, -1)
         ckp_vecs = np.array([ckp_embed[0] for ckp_embed in ckps_embed.values()])
-        ckpIndex2sentIndex = {i : ckp_embed[1] for ckp_embed in ckps_embed.values() for i in range(len(ckps_embed)}
-
+        # this dict maps ckp_vecs index to sent_index, ckp_vecs index = unselected_ckp = [i for i in range(len(ckp_vecs))]
+        ckpIndex2sentIndex = {i : ckp_embed[1] for i in range(len(ckps_embed)) for ckp_embed in ckps_embed.values()}
 
         # 2d list, inner dimension contains only 1 value representing cos sim between doc and ckp
         doc_ckp_sims = cosine_similarity(ckp_vecs, doc_vec)
@@ -361,6 +361,7 @@ class EmbedRank:
         # find the most similar keyword (using original cosine similarities)
         best_ckp_index = np.argmax(doc_ckp_sims)
         selected_ckp.append(best_ckp_index)
+        selected_sent_index.append(ckpIndex2sentIndex[best_ckp_index])
         unselected_ckp.remove(best_ckp_index)
 
         # do top_n - 1 cycle to select top N keywords
@@ -379,8 +380,9 @@ class EmbedRank:
             # add new ckp to list
             selected_ckp.append(true_ckp_index)
             unselected_ckp.remove(true_ckp_index)
+            selected_sent_index.append(ckpIndex2sentIndex[true_ckp_index])
         
         # return the ckp string of selected ckps
         ckp_strings = np.array(list(ckps_embed.keys()))
         selected_ckp_strings = ckp_strings[selected_ckp]
-        return selected_ckp_strings, selected_ckp
+        return selected_ckp_strings, selected_sent_index
