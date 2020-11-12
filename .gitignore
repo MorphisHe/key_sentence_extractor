@@ -7,3 +7,4 @@ test.py
 *.model
 .DS_Store
 results/
+node_modules/

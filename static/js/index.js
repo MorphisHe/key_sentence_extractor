@@ -1,6 +1,9 @@
 
 console.log("Welcome");
-document.getElementById("test").addEventListener("click", () => {
-    console.log("Im in");
-    button.innerHTML = "sds";
-});
+const button = document.getElementById("test");
+
+function buttonHandler(){
+    document.getElementById("test").innerHTML = "CHANGED";
+}
+
+button.addEventListener("click", buttonHandler);

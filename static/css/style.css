@@ -1,0 +1,39 @@
+/* Create two equal columns that floats next to each other */
+
+/* Clear floats after the columns */
+.row {
+  display: flex;
+  height: 99vh;
+}
+
+.container{
+    border-style: solid;
+    border-width: 1px;
+    border-radius: .5em;
+}
+
+.container-left {
+    background-color: rgb(255, 157, 157);
+}
+
+.container-right {
+    display: flex;
+    flex-direction: column;
+    border-color: transparent;
+}
+
+.ckp-list {
+    height: 49.5vh;
+    background-color: rgb(147, 255, 156);
+}
+
+.embedding-plot {
+    height: 49.5vh;
+    background-color: rgb(123, 123, 255);
+}
+
+@media screen {
+  .container {
+    width: 100%;
+  }
+}

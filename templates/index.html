@@ -1,24 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- CSS link -->
-
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Key Sentence Extractor</title>
-</head>
+  </head>
 
+  <body>
+    <div class="row">
+      <div class="container container-left">
+        <h2>Column 1</h2>
+        <p>Some text..</p>
+        <button id="test">click me</button>
+      </div>
+      <div class="container container-right">
+          <div class="container ckp-list">
+            <h2>Candidate Key Phrase List</h2>
+          </div>
+          <div class="container embedding-plot">
+            <h2>Embedding Plot</h2>
+          </div>
+      </div>
+    </div>
+  </body>
 
-
-<body>
-    <h1>Welcome bitches</h1>
-    <button id=test> click me </button>
-</body>
-
-
-
-<!-- JS link -->
-<script src="{{url_for('static', filename='js/index.js')}}"></script>
-
+  <!-- CSS and JS link -->
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="{{url_for('static', filename='js/index.js')}}"></script>
+  
 </html>
