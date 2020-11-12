@@ -1,5 +1,5 @@
 from embed_rank.EmbedRank import EmbedRank
-from flask import Flask, request
+from flask import Flask, request, render_template
 from io import BytesIO
 
 MODEL_PATH = "d500_w4_mc8_n9_e50.model"
@@ -7,6 +7,9 @@ app = Flask(__name__)
 er = EmbedRank(model_path=MODEL_PATH)
 
 
+@app.route("/", methods=["GET"])
+def home():
+    return render_template("index.html")
 
 @app.route("/get_key_phrases", methods=["GET", "POST"])
 def get_key_phrases():
