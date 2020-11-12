@@ -121,9 +121,9 @@ class EmbedRank:
 
         Return:
         ---------------
-        sent_token: list of sent token
+        og_sent: list of sent token
 
-        word_toekn: list of cleanned word tokens
+        word_token: list of cleanned word tokens
         '''
         # remove accents
         text = unidecode.unidecode(text)
@@ -212,8 +212,8 @@ class EmbedRank:
         Return:
         ---------------
         new_lst_word_tokens: 2d list with first dimension representing the sentence of text corpus
-        and second dimension the candidate key phrases extracted from the sentence
-        [["kp1", "kp2", ...], [], ....., []]
+                             and second dimension the candidate key phrases extracted from the sentence
+                             [["kp1", "kp2", ...], [], ....., []]
         '''
         # remove stop words and words with <= 2 chars or > 21 chars
         stopwords_temp = self.stop_words if remove_stopwords else []
@@ -261,8 +261,8 @@ class EmbedRank:
                             break
                     if pass_flag:
                         new_sent_token.append(phrase_token)
-            if len(new_sent_token):
-                new_lst_word_tokens.append(new_sent_token)
+            #if len(new_sent_token):
+            new_lst_word_tokens.append(new_sent_token)
 
         return new_lst_word_tokens
 
@@ -317,7 +317,7 @@ class EmbedRank:
         return doc_embed, ckps_embed
 
     
-    def mmr(self, doc_embed, ckps_embed, beta=0.7, top_n=10):
+    def mmr(self, doc_embed, ckps_embed, beta=0.55, top_n=10):
         '''
         This method applied mmr to pick the top_n ckp with controlled similarity between ckps
 
@@ -336,8 +336,9 @@ class EmbedRank:
         # get the vector of doc and ckps
         doc_vec = doc_embed[1].reshape(1, -1)
         ckp_vecs = np.array([ckp_embed[0] for ckp_embed in ckps_embed.values()])
-        # this dict maps ckp_vecs index to sent_index, ckp_vecs index = unselected_ckp = [i for i in range(len(ckp_vecs))]
-        ckpIndex2sentIndex = {i : ckp_embed[1] for i in range(len(ckps_embed)) for ckp_embed in ckps_embed.values()}
+
+        # this list stores sent_index with current index as index of ckp
+        ckpIndex2sentIndex = [ckp_embed[1] for ckp_embed in ckps_embed.values()]
 
         # 2d list, inner dimension contains only 1 value representing cos sim between doc and ckp
         doc_ckp_sims = cosine_similarity(ckp_vecs, doc_vec)

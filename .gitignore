@@ -1,9 +1,10 @@
 env/
 __pycache__/
 .vscode/
-out.txt
+*.txt
 *.pdf
 *.docx
 test.py
 *.model
 .DS_Store
+results/
