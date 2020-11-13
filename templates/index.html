@@ -8,24 +8,34 @@
 
   <body>
     <div class="row">
-      <div class="container container-left">
-        <h2>Column 1</h2>
-        <p>Some text..</p>
-        <button id="test">click me</button>
+      <div class="container" id="container-left">
+        <object
+          data="{{ url_for('static', filename='test_doc.pdf')}}"
+          type="application/pdf"
+          id="pdf-container"
+        ></object>
       </div>
-      <div class="container container-right">
-          <div class="container ckp-list">
-            <h2>Candidate Key Phrase List</h2>
-          </div>
-          <div class="container embedding-plot">
-            <h2>Embedding Plot</h2>
-          </div>
+      
+      <div id="dragbar"></div>
+      
+
+      <div class="container" id="container-right">
+        <div class="container" id="ckp-list">
+          <h2>Candidate Key Phrase List</h2>
+        </div>
+        <div class="container" id="embedding-plot">
+          <h2>Embedding Plot</h2>
+        </div>
       </div>
     </div>
   </body>
 
   <!-- CSS and JS link -->
-  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+  <link
+    rel="stylesheet"
+    type="text/css"
+    href="{{ url_for('static', filename='css/style.css') }}"
+  />
+  <script type=text/javascript src="{{url_for('static', filename='js/jquery.js') }}"></script>
   <script src="{{url_for('static', filename='js/index.js')}}"></script>
-  
 </html>

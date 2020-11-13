@@ -1,6 +1,6 @@
 from embed_rank.EmbedRank import EmbedRank
 from flask import Flask, request, render_template
-from io import BytesIO
+import base64
 
 MODEL_PATH = "d500_w4_mc8_n9_e50.model"
 app = Flask(__name__)
