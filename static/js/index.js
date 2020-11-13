@@ -1,3 +1,5 @@
+
+// dragger handler
 var dragging = false;
 $("#dragbar").mousedown(function (e) {
   e.preventDefault();
@@ -8,7 +10,6 @@ $("#dragbar").mousedown(function (e) {
       var percentage = (e.pageX / window.innerWidth) * 100;
       var contLeftPercentage = 100 - percentage;
 
-      
       $("#pdf-container").css("width", "0%");
       $("#container-left").css("width", percentage + "%");
       $("#container-right").css("width", contLeftPercentage + "%");
@@ -16,8 +17,8 @@ $("#dragbar").mousedown(function (e) {
   });
 });
 
+// show pdf-container when not dragging
 $(document).mouseup(function (e) {
   dragging = false;
   $("#pdf-container").css("width", "100%");
-  document.getElementById("pdf-container").page = 1;
 });
