@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Key Sentence Extractor</title>
+</head>
+
+<body>
+  <div class="row">
+    <div class="container" id="container-left">
+        <object
+          data={{ url_for('static', filename = {{ pdf_filename }} ) }}
+          type="application/pdf"
+          id="pdf-container"
+        ></object>
+    </div>
+
+    <div class="dragbar" id="col-dragbar"></div>
+
+    <div class="container" id="container-right">
+      <div class="container" id="ckp-list">
+        <h2>Candidate Key Phrase List</h2>
+      </div>
+      <div class="dragbar" id="row-dragbar"></div>
+      <div class="container" id="embedding-plot">
+        <h2>Embedding Plot</h2>
+      </div>
+    </div>
+  </div>
+</body>
+
+<!-- CSS and JS link -->
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}" />
+<script type=text/javascript src="{{url_for('static', filename='js/jquery.js') }}"></script>
+<script src="{{url_for('static', filename='js/index.js')}}"></script>
+
+</html>
