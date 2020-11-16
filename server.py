@@ -11,6 +11,21 @@ er = EmbedRank(model_path=MODEL_PATH)
 def home():
     return render_template("index.html")
 
+def embed_rank_pipline(pdf_filename):
+    text = er.extract_information(pdf_filename)
+
+    sent_token, word_token = er.tokenize(text)
+    assert len(sent_token) == len(word_token)
+
+    word_token = er.pos_tag(word_token)
+    assert len(sent_token) == len(word_token)
+
+    word_token = er.preprocess(word_token)
+    assert len(sent_token) == len(word_token)
+
+    doc_embed, ckps_embed = er.embed_doc_ckps(pdf_filename, word_token)
+    selected_ckp_strings, selected_sent_index = er.mmr(doc_embed, ckps_embed)
+
 @app.route("/get_key_phrases", methods=["GET", "POST"])
 def get_key_phrases():
     '''
@@ -19,9 +34,10 @@ def get_key_phrases():
     text = er.extract_information("test.pdf")
     return text
     '''
-    pdf = open(request.files["doc"], "rb")
-    text = er.extract_information(pdf)
-    return text
+    #pdf = open(request.files["doc"], "rb")
+    #text = er.extract_information(pdf)
+    names = ["hi", "no"]
+    return render_template("content.html", pdf_filename="test_doc4.pdf", names=names)
 
 
 
