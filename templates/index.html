@@ -1,41 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Key Sentence Extractor</title>
-  </head>
 
-  <body>
-    <div class="row">
-      <div class="container" id="container-left">
-        <object
-          data="{{ url_for('static', filename='test_doc.pdf')}}"
-          type="application/pdf"
-          id="pdf-container"
-        ></object>
-      </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Key Sentence Extractor</title>
+</head>
 
-      <div class="dragbar" id="col-dragbar"></div>
-      
-      <div class="container" id="container-right">
-        <div class="container" id="ckp-list">
-          <h2>Candidate Key Phrase List</h2>
-        </div>
-        <div class="dragbar" id="row-dragbar"></div>
-        <div class="container" id="embedding-plot">
-          <h2>Embedding Plot</h2>
+<body>
+  <div class="row">
+    <div class="container" id="container-left">
+      <div class="wrapper" id="wrapper">
+        <div class="drop">
+          <div class="cont">
+            <i class="fa fa-cloud-upload"></i>
+            <div class="tit">
+              Drag & Drop
+            </div>
+            <div class="desc">
+              your file to process
+            </div>
+            <div class="browse">
+              click here to browse
+            </div>
+          </div>
+          <output id="list"></output>
+          <input id="files" multiple="false" name="files[]" type="file" />
         </div>
       </div>
     </div>
-  </body>
 
-  <!-- CSS and JS link -->
-  <link
-    rel="stylesheet"
-    type="text/css"
-    href="{{ url_for('static', filename='css/style.css') }}"
-  />
-  <script type=text/javascript src="{{url_for('static', filename='js/jquery.js') }}"></script>
-  <script src="{{url_for('static', filename='js/index.js')}}"></script>
+    <div class="dragbar" id="col-dragbar"></div>
+
+    <div class="container" id="container-right">
+      <div class="container" id="ckp-list">
+        <h2>Candidate Key Phrase List</h2>
+      </div>
+      <div class="dragbar" id="row-dragbar"></div>
+      <div class="container" id="embedding-plot">
+        <h2>Embedding Plot</h2>
+      </div>
+    </div>
+  </div>
+</body>
+
+<!-- CSS and JS link -->
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}" />
+<script type=text/javascript src="{{url_for('static', filename='js/jquery.js') }}"></script>
+<script src="{{url_for('static', filename='js/index.js')}}"></script>
+
 </html>
