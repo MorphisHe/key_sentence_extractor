@@ -162,15 +162,14 @@ class EmbedRank:
                 new_sent_token.append(sentence[previous_end_index+1 : start_index])
             previous_end_index = end_index
         new_sent_token.append(sentence[previous_end_index :])
-
-        print("Sentence #:", sent_num)
+        '''
         print("Old Sentence:\n", [sentence])
         print("="*20)
         print("New Sentences:\n")
         for sent in new_sent_token:
             print(["*", sent])
         print("="*20, "\n\n")
-
+        '''
         return new_sent_token
 
 
