@@ -16,16 +16,19 @@
     <div class="dragbar" id="col-dragbar"></div>
 
     <div class="container" id="container-right">
-      <div class="container" id="ckp-list"> Candidate Key Phrase List
-        {% for name in names %}
+      <div class="container container-right" id="ckp-list"> Candidate Key Phrase List
+        {% for ckp, rank_sent_tup in data["zip_display"] %}
         <section class="accordion">
-          <input type="checkbox" name="collapse" id={{ name }}>
+          <input type="checkbox" name="collapse" id="ckp:{{ ckp }}">
           <h2 class="handle">
-            <label for={{ name }}>26A. Trappist Single</label>
+            <label for="ckp:{{ ckp }}">
+              <strong>Rank:</strong> {{ rank_sent_tup[0] }}
+              <strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Original Sentence #:</strong> {{ rank_sent_tup[2] }}
+              <strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Key Phrase:</strong> {{ ckp }}
+            </label>
           </h2>
           <div class="content">
-            <p><strong>Overall Impression:</strong> A pale, bitter, highly attenuated and well carbonated Trappist ale, showing a fruity-spicy Trappist yeast character, a spicy-floral hop profile, and a soft, supportive grainy-sweet malt palate.</p>
-            <p><strong>History:</strong> While Trappist breweries have a tradition of brewing a lower-strength beer as a monk’s daily ration, the bitter, pale beer this style describes is a relatively modern invention reflecting current tastes. Westvleteren first brewed theirs in 1999, but replaced older lower-gravity products.</p>
+            <p><Strong>Full Sentence Display:</Strong>{{ rank_sent_tup[1] }}</p>
           </div>
         </section>
         {% endfor %}
@@ -33,8 +36,18 @@
 
       <div class="dragbar" id="row-dragbar"></div>
 
-      <div class="container" id="embedding-plot">
-        Embedding Plot
+      <div class="container container-right" id="embedding-plot">
+        {% for tupple in data["og_sents"] %}
+        <section class="accordion">
+          <input type="checkbox" name="collapse" id="Original Sentence #{{ tupple[0] }}">
+          <h2 class="handle">
+            <label for="Original Sentence #{{ tupple[0] }}">Original Sentence #{{ tupple[0] }}</label>
+          </h2>
+          <div class="content container-right">
+            <p>{{ tupple[1] }}</p>
+          </div>
+        </section>
+        {% endfor %}
       </div>
     </div>
   </div>
