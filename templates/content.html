@@ -17,6 +17,7 @@
 
     <div class="container" id="container-right">
       <div class="container container-right" id="ckp-list"> Candidate Key Phrase List
+        <button class="sort">Sort</button>
         {% for ckp, rank_sent_tup in data["zip_display"] %}
         <section class="accordion">
           <input type="checkbox" name="collapse" id="ckp:{{ ckp }}">

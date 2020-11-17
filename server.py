@@ -5,7 +5,8 @@ import base64
 MODEL_PATH = "d500_w4_mc8_n9_e50.model"
 app = Flask(__name__)
 er = EmbedRank(model_path=MODEL_PATH)
-
+res_dict = {}
+cur_sort_mode = "rank"
 
 @app.route("/", methods=["GET"])
 def home():
@@ -21,10 +22,23 @@ def get_key_phrases():
     '''
     #pdf = open(request.files["doc"], "rb")
     #text = er.extract_information(pdf)
+    global res_dict
     res_dict = embed_rank_pipline("test_doc4.pdf")
 
     return render_template("content.html", pdf_filename="test_doc4.pdf", data=res_dict)
 
+@app.route("/get_key_phrases/sort", methods=["GET", "POST"])
+def sort():
+    global cur_sort_mode
+    global res_dict
+    if cur_sort_mode == "rank":
+        res_dict["zip_display"] = sorted(res_dict["zip_display"], key = lambda x: x[1][-1])
+        cur_sort_mode = "original"
+    else:
+        res_dict["zip_display"] = sorted(res_dict["zip_display"], key = lambda x: x[1][0])
+        cur_sort_mode = "rank"
+
+    return render_template("content.html", pdf_filename="test_doc4.pdf", data=res_dict)
 
 def reconstructor(sent_token, selected_ckp_strings, selected_sent_index):
     '''
