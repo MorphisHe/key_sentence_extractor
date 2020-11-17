@@ -103,7 +103,7 @@ class EmbedRank:
         return text
 
 
-    def detect_digit_line(self, sentence, sent_num, min_threshold=10, window_size=4): #Delete
+    def detect_digit_line(self, sentence, min_threshold=10, window_size=4):
         '''
         Helper function for clear_graph_digits that detects the digit line in sentence
 
@@ -200,14 +200,12 @@ class EmbedRank:
         '''
 
         new_sent_token = []
-        sent_num = 0 #Delete
         for sent in sent_token:
             num_digits = sum(char.isdigit() for char in sent)
             if num_digits >= check_threshold:
-                new_sent_token += self.detect_digit_line(sent, sent_num) #Delete
+                new_sent_token += self.detect_digit_line(sent)
             else:
                 new_sent_token.append(sent)
-            sent_num += 1 #Delete
         return new_sent_token
 
 
