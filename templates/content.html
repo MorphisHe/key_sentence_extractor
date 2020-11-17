@@ -17,7 +17,9 @@
 
     <div class="container" id="container-right">
       <div class="container container-right" id="ckp-list"> Candidate Key Phrase List
-        <button class="sort">Sort</button>
+        <form action="/get_key_phrases/sort" method="post">
+          <button type="submit" id="sort-button">Sort</button>
+        </form>
         {% for ckp, rank_sent_tup in data["zip_display"] %}
         <section class="accordion">
           <input type="checkbox" name="collapse" id="ckp:{{ ckp }}">
@@ -29,7 +31,7 @@
             </label>
           </h2>
           <div class="content">
-            <p><Strong>Full Sentence Display:</Strong>{{ rank_sent_tup[1] }}</p>
+            <p><Strong>Full Sentence Display:&nbsp;</Strong>{{ rank_sent_tup[1] }}</p>
           </div>
         </section>
         {% endfor %}
