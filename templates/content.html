@@ -22,7 +22,7 @@
         </form>
         {% for ckp, rank_sent_tup in data["zip_display"] %}
         <section class="accordion">
-          <input type="checkbox" name="collapse" id="ckp:{{ ckp }}">
+          <input type="checkbox" name="collapse" id="ckp:{{ ckp }}" checked>
           <h2 class="handle">
             <label for="ckp:{{ ckp }}">
               <strong>Rank:</strong> {{ rank_sent_tup[0] }}

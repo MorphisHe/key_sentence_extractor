@@ -78,7 +78,7 @@ def embed_rank_pipline(pdf_filename):
     word_token = er.preprocess(word_token)
     assert len(sent_token) == len(word_token)
 
-    doc_embed, ckps_embed = er.embed_doc_ckps(pdf_filename, word_token, mode="dict_mode")
+    doc_embed, ckps_embed = er.embed_doc_ckps(pdf_filename, word_token, mode="infer_mode")
     selected_ckp_strings, selected_sent_index = er.mmr(doc_embed, ckps_embed)
 
     return reconstructor(sent_token, selected_ckp_strings, selected_sent_index)
