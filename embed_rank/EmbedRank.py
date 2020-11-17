@@ -1,3 +1,4 @@
+from string import punctuation
 from tika import parser
 import nltk
 import unidecode
@@ -101,6 +102,115 @@ class EmbedRank:
             print("\n")
         return text
 
+
+    def detect_digit_line(self, sentence, sent_num, min_threshold=10, window_size=4): #Delete
+        '''
+        Helper function for clear_graph_digits that detects the digit line in sentence
+
+        Parameter:
+        ---------------
+        sentence: string
+
+        min_threshold: default 10, if valid digits in sentence is >= this, then this sentence contains graph information
+
+        window_size: default 4, window size to consider continous digit in sentence
+                     ex: (2ab 42. 239). sdsd 2
+                     things in () is consider a valid continous graph information
+        
+        Parameter:
+        ---------------
+        new_sent_token: clean list of sent token without graph information. [sent1, sent2, ..]
+        0123456789
+        '''
+        new_sent_token = []
+        # stores data of detected digit line. [ (start index, end index), ... ]
+        digit_line_info = []
+        cur_info = {}
+        # None means searching for start_index
+        # digit means cur window position. If this > window_size, means end of digit line
+        cur_stage = None
+        for char_index in range(len(sentence)):
+            char = sentence[char_index]
+            if char.isdigit():
+                if not cur_stage:
+                    cur_info["start_index"] = char_index
+                cur_info["end_index"] = char_index
+                cur_stage = 1
+            else:
+                if cur_stage == window_size:
+                    digit_line_length = cur_info["end_index"]-cur_info["start_index"]+1
+                    if digit_line_length >= min_threshold:
+                        for temp_index in range(cur_info["end_index"]+1, len(sentence)):
+                            if not sentence[temp_index].isalnum():
+                                cur_info["end_index"] = temp_index
+                            else:
+                                break
+                        digit_line_info.append((cur_info["start_index"], cur_info["end_index"]))
+                    # reset variables
+                    cur_info = {}
+                    cur_stage = None
+                elif cur_stage:
+                    cur_stage += 1
+        
+        # start slicing the original sentence by detected digit line(s)
+        previous_end_index = 0
+        for info_tup in digit_line_info:
+            start_index, end_index = info_tup
+            if previous_end_index == 0:
+                new_sent_token.append(sentence[0 : start_index])
+            else:
+                new_sent_token.append(sentence[previous_end_index+1 : start_index])
+            previous_end_index = end_index
+        new_sent_token.append(sentence[previous_end_index :])
+
+        print("Sentence #:", sent_num)
+        print("Old Sentence:\n", [sentence])
+        print("="*20)
+        print("New Sentences:\n")
+        for sent in new_sent_token:
+            print(["*", sent])
+        print("="*20, "\n\n")
+
+        return new_sent_token
+
+
+    def clear_graph_digits(self, sent_token, check_threshold=20, min_threshold=10, window_size=4):
+        '''
+        This method is only for key sentence extraction with TIKA for following reason
+            - TIKA extracts graph information at the end of each page
+            - Numbers are group together, so it is better to discard them
+        
+        This method checks for graph information and delete them. Sentence will be splited into 2 sentences
+
+        Parameter:
+        ---------------
+        sent_token: list of sent token
+
+        check_threshold: default 20, if number of digits in a sentence is >= this, start checking
+
+        min_threshold: default 10, if valid digits in sentence is >= this, then this sentence contains graph information
+
+        window_size: default 4, window size to consider continous digit in sentence
+                     ex: (2ab 42. 239). sdsd 2
+                     things in () is consider a valid continous graph information
+        
+        Parameter:
+        ---------------
+        new_sent_token: clean list of sent token without graph information. [sent1, sent2, ...]
+        '''
+
+        new_sent_token = []
+        sent_num = 0 #Delete
+        for sent in sent_token:
+            num_digits = sum(char.isdigit() for char in sent)
+            if num_digits >= check_threshold:
+                new_sent_token += self.detect_digit_line(sent, sent_num) #Delete
+            else:
+                new_sent_token.append(sent)
+            sent_num += 1 #Delete
+        return new_sent_token
+
+
     def tokenize(self, text):
         '''
         TODO: empty sentence removal
@@ -128,6 +238,7 @@ class EmbedRank:
         # remove accents
         text = unidecode.unidecode(text)
         og_sent = self.sent_tokenizer(text)
+        og_sent = self.clear_graph_digits(og_sent)
    
         # remove URLs (both http and www), emails, and digits
         # http\S+: regex for http links
