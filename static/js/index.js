@@ -44,8 +44,6 @@ $(document).mouseup(function (e) {
   }
 });
 
-
-
 // ========================== DropBox ==========================
 var drop = $("input");
 drop
@@ -67,30 +65,23 @@ drop
       color: "#8E99A5",
     });
   });
-  
+
 function handleFileSelect(e) {
-  // replace dropbox with pdf
-  let filename = e.target.files[0].name;
-
-
-  /** 
-  var file = e.target.files[0];
-
-  // Read the file using file reader
-  var fileReader = new FileReader();
-
-  fileReader.onload = function () {
-    // turn array buffer into typed array
-    var typedarray = new Uint8Array(this.result);
-
-    // create xhttp request to flask server
-    var xhttp = new XMLHttpRequest();
-    xhttp.open("POST", typedarray, true);
-    xhttp.send();
-  };
-  //Step 3:Read the file as ArrayBuffer
-  fileReader.readAsArrayBuffer(file);
-  */
+  var form_data = new FormData($("#upload-file")[0]);
+  $.ajax({
+    type: "POST",
+    url: "/upload_file",
+    data: form_data,
+    contentType: false,
+    cache: false,
+    processData: false,
+  })
+    .done(() => {
+      window.location.replace(window.location.href + "get_key_phrases");
+    })
+    .fail(() => {
+      console.log("Ajax failed: " + data["responseText"]);
+    });
 }
 
-$("#files").change(handleFileSelect);
+$("#upload-file").change(handleFileSelect);
