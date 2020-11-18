@@ -1,10 +1,10 @@
 from embed_rank.EmbedRank import EmbedRank
 from flask import Flask, request, render_template
-import base64
 
 MODEL_PATH = "d500_w4_mc8_n9_e50.model"
 app = Flask(__name__)
 er = EmbedRank(model_path=MODEL_PATH)
+FILE_NAME = "static/temp.pdf"
 res_dict = {}
 cur_sort_mode = "rank"
 
@@ -14,18 +14,9 @@ def home():
 
 @app.route("/get_key_phrases", methods=["GET", "POST"])
 def get_key_phrases():
-    '''
-    f = request.files["doc"]
-    f.save("test.pdf")
-    text = er.extract_information("test.pdf")
-    return text
-    '''
-    #pdf = open(request.files["doc"], "rb")
-    #text = er.extract_information(pdf)
     global res_dict
-    res_dict = embed_rank_pipline("test_doc4.pdf")
-
-    return render_template("content.html", pdf_filename="test_doc4.pdf", data=res_dict)
+    res_dict = embed_rank_pipline(FILE_NAME)
+    return render_template("content.html", pdf_filename=FILE_NAME.split("/")[-1], data=res_dict)
 
 @app.route("/get_key_phrases/sort", methods=["GET", "POST"])
 def sort():
@@ -38,7 +29,13 @@ def sort():
         res_dict["zip_display"] = sorted(res_dict["zip_display"], key = lambda x: x[1][0])
         cur_sort_mode = "rank"
 
-    return render_template("content.html", pdf_filename="test_doc4.pdf", data=res_dict)
+    return render_template("content.html", pdf_filename=FILE_NAME.split("/")[-1], data=res_dict)
+
+@app.route("/upload_file", methods=["POST"])
+def upload_file():
+    f = request.files['file']
+    f.save(FILE_NAME)
+    return "Success"
 
 def reconstructor(sent_token, selected_ckp_strings, selected_sent_index):
     '''
@@ -47,6 +44,7 @@ def reconstructor(sent_token, selected_ckp_strings, selected_sent_index):
     selected_full_sents = [(rank, og_sent, sent_index)]
     zip_display = [(ckp1, (rank1, og_sent_for_ckp1, sent_index)), ...]
     '''
+
     res_dict = {
         "og_sents" : [],
         "selected_ckp_strings" : selected_ckp_strings,
@@ -82,6 +80,8 @@ def embed_rank_pipline(pdf_filename):
     selected_ckp_strings, selected_sent_index = er.mmr(doc_embed, ckps_embed)
 
     return reconstructor(sent_token, selected_ckp_strings, selected_sent_index)
+
+
 
 
 if __name__ == "__main__":
