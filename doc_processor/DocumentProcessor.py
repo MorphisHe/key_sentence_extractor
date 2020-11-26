@@ -22,7 +22,6 @@ class ProcessType:
 class SingleDocumentProcessor:
     '''
     This class process a single s3 pdf document by converting pages into image then extract information from it
-    This is a iterator class
     '''
     textract = boto3.client("textract")
     pageNum2BytesArr = {} # dict mapping page number to corresponding bytes array
@@ -41,14 +40,6 @@ class SingleDocumentProcessor:
             page_nums = list(range(1, len(imgs)+1))
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 executor.map(self.image_to_bytes, imgs, page_nums)
-
-    def __iter__(self):
-        '''
-        returns bytes array of next page of pdf
-        '''
-        page_nums = list(range(1, len(self.pageNum2BytesArr)+1))
-        for page_num in page_nums:
-            yield self.pageNum2BytesArr[page_num]
 
     def image_to_bytes(self, img, page_num):
         '''
@@ -103,10 +94,10 @@ class SingleDocumentProcessor:
 
         return:
         =================
-        pageNum2Result: dict that maps page number to corresponding aws textract response
+        results: list of textract response in page number accending order
         '''
         pageNum2Result = {}
-        max_sim_calls = 20 # max same time call allowed for aws textract
+        max_sim_calls = 10 # max same time call allowed for aws textract
         page_nums = list(self.pageNum2BytesArr.keys())
         cur_page_nums_slice = page_nums[:max_sim_calls]
         cur_right_index = max_sim_calls
@@ -117,14 +108,10 @@ class SingleDocumentProcessor:
                 pageNum2Result[res[0]] = res[1]
             cur_page_nums_slice = page_nums[cur_right_index : cur_right_index+max_sim_calls]
             cur_right_index += max_sim_calls
-        '''
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            results = executor.map(self.get_single_page_results, self.pageNum2BytesArr.keys())
 
-        pageNum2Result = {res[0] : res[1] for res in results} # mapping page number to textract results
-        '''
         self.clear_memory()
-        return pageNum2Result
+        results = [pageNum2Result[page_num] for page_num in sorted(list(pageNum2Result.keys()))]
+        return results
 
     def clear_memory(self):
         '''
@@ -244,8 +231,8 @@ class BatchDocumentProcessor:
         job_doc_name = self.jobId2DocName[job_id]
         if status == "SUCCEEDED":
             print(f"\nGetting Results For Job: {job_doc_name}")
-            res_list = []
             response = self.jobId2TextractFunc[job_id](JobId=job_id)
+            res_list = [response]
             next_token = None if "NextToken" not in response else response["NextToken"]
             
             while next_token:
