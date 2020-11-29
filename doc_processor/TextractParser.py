@@ -1,7 +1,4 @@
 
-from collections import defaultdict
-
-
 class BlockType:
     PAGE = "PAGE"
 
@@ -57,7 +54,7 @@ class BoundingBox:
     '''
     Struct
     ==============
-    BoudingBox: {
+    ### BoudingBox: {
         Width: float
         Height: float
         Left: float
@@ -95,7 +92,7 @@ class Vertex:
     '''
     Struct
     ==============
-    Vertex: {
+    ### Vertex: {
         x: float
         y: float
     }
@@ -121,7 +118,7 @@ class Polygon:
     '''
     Struct
     ==============
-    Polygon: {
+    ### Polygon: {
         vertices: [class Vertex, ...]
     }
     '''
@@ -144,7 +141,7 @@ class Geometry:
     '''
     Struct
     ==============
-    Geometry: {
+    ### Geometry: {
         BoudingBox: Object
         Polygon: Object
     }
@@ -171,7 +168,7 @@ class Geometry:
         return bb + "================" + poly
 
     @property
-    def boundingBox(self):
+    def bounding_box(self):
         return self._bounding_box
 
     @property
@@ -190,7 +187,7 @@ class Word:
     '''
     Struct
     ==============
-    Word: {
+    ### Word: {
         block: textract block object with block type "word"
         confidence: textract confidence score
         geometry: geometry object
@@ -237,7 +234,7 @@ class Line:
     '''
     Struct
     ==============
-    Line: {
+    ### Line: {
         block: textract block object with block type "line"
         confidence: textract confidence score
         geometry: geometry object
@@ -248,6 +245,11 @@ class Line:
     '''
 
     def __init__(self, block, block_map):
+        '''
+        block: textract block object with block type "line"
+
+        block_map: dict that maps block_id to block object
+        '''
         self._block = block
         self._confidence = block[ResponseKeys.CONFIDENCE]
         self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
@@ -301,7 +303,7 @@ class SelectionElement:
     '''
     Struct
     ==============
-    SelectionElement: {
+    ### SelectionElement: {
         confidence: textract confidence score
         geometry: geometry object
         id: id of current textract block
@@ -310,6 +312,9 @@ class SelectionElement:
     '''
 
     def __init__(self, block):
+        '''
+        block: textract block object with block type "SelectionElement"
+        '''
         self._confidence = block[ResponseKeys.CONFIDENCE]
         self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
         self._id = block[ResponseKeys.ID]
@@ -336,7 +341,7 @@ class FieldKey:
     '''
     Struct
     ==============
-    FieldKey: {
+    ### FieldKey: {
         block: textract block object with block type "key_value_set" and entity type "key"
         confidence: textract confidence score
         geometry: geometry object
@@ -345,7 +350,7 @@ class FieldKey:
         text: str for the list of word object in content
     }
 
-    Textract Resposne:
+    ### Textract Resposne:
         Block: {
             "BlockType": "KEY_VALUE_SET"
             "EntityTypes": ["KEY"]
@@ -363,6 +368,13 @@ class FieldKey:
     '''
 
     def __init__(self, block, child_ids, block_map):
+        '''
+        block: textract block object with block type "KeyValueSet" and entity type of "KEY"
+    
+        child_ids: list of child ids
+
+        block_map: dict that maps block_id to block object
+        '''
         self._block = block
         self._confidence = block[ResponseKeys.CONFIDENCE]
         self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
@@ -411,7 +423,7 @@ class FieldValue:
     '''
     Struct
     ==============
-    FieldValue: {
+    ### FieldValue: {
         block: textract block object with block type "key_value_set" and entity type "value"
         confidence: textract confidence score
         geometry: geometry object
@@ -420,7 +432,7 @@ class FieldValue:
         text: str for the list of word object in content or selection status
     }
 
-    Textract Resposne:
+    ### Textract Resposne:
         Block: {
             "BlockType": "KEY_VALUE_SET"
             "EntityTypes": ["VALUE"]
@@ -437,6 +449,13 @@ class FieldValue:
     '''
 
     def __init__(self, block, child_ids, block_map):
+        '''
+        block: textract block object with block type "KeyValueSet" and entity type of "VALUE"
+    
+        child_ids: list of child ids
+
+        block_map: dict that maps block_id to block object
+        '''
         self._block = block
         self._confidence = block[ResponseKeys.CONFIDENCE]
         self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
@@ -488,7 +507,7 @@ class KeyValueSet:
     '''
     Struct
     ==============
-    KeyValueSet: {
+    ### KeyValueSet: {
         key: FieldKey object
         value: FieldValue object
     }
@@ -538,7 +557,7 @@ class Form:
     '''
     Struct
     ==============
-    Form: {
+    ### Form: {
         key_value_sets: list of KeyValueSet object
         key_value_set_map: maps key.text to KeyValueSet object
     }
@@ -599,7 +618,7 @@ class Cell:
     '''
     Struct
     ==============
-    Cell: {
+    ### Cell: {
         block: textract block object with block type "cell"
         confidence: textract confidence score
         geometry: geometry object
@@ -612,6 +631,11 @@ class Cell:
     '''
 
     def __init__(self, block, block_map):
+        '''
+        block: textract block object with block type "CELL"
+
+        block_map: dict that maps block_id to block object
+        '''
         self._block = block
         self._confidence = block[ResponseKeys.CONFIDENCE]
         self._row_index = block[ResponseKeys.ROW_INDEX]
@@ -676,8 +700,8 @@ class Row:
     '''
     Struct
     ==============
-    Row: {
-        cells: list of cells in table
+    ### Row: {
+        cells: list of cell object in table
     }
     '''
 
@@ -702,7 +726,7 @@ class Table:
     '''
     Struct
     ==============
-    Table: {
+    ### Table: {
         block: textract block object with block type "table"
         confidence: textract confidence score
         geometry: geometry object
@@ -714,6 +738,8 @@ class Table:
     def __init__(self, block, block_map):
         '''
         block: textract repsonse of block type "TABLE"
+
+        block_map: dict that maps block_id to block object
         '''
         self._block = block
         self._confidence = block[ResponseKeys.CONFIDENCE]
@@ -779,7 +805,7 @@ class Page:
     '''
     Struct
     ==============
-    Page: {
+    ### Page: {
         blocks: textract blocks list (contains all blocks in a page)
         lines: list of line objects
         form: form object
@@ -791,6 +817,15 @@ class Page:
     '''
 
     def __init__(self, page_num, blocks, block_map, non_line_childs):
+        '''
+        page_num: the page number of this Page object 
+
+        block: textract block object with block type "PAGE"
+
+        block_map: dict that maps block_id to block object
+
+        non_line_childs: list of child_ids that belongs to TABLE or FORM
+        '''
         self._blocks = blocks
         self._text = ""
         self._lines = []
@@ -842,6 +877,7 @@ class Page:
 
     def get_lines_readable(self):
         '''
+        TODO
         return lines of current page in readable order (column and row organized)
         '''
         columns = []
@@ -921,6 +957,16 @@ class Page:
 
 
 class Document:
+    '''
+    Struct
+    ==============
+    ### Document: {
+        total_pages: total number of pages in this document
+        pageNum2Block: dict that maps page number to all blocks in that page
+        block_map: dict that maps block_id to block object
+        doc_pages: list that contains Page objects
+    }
+    '''
     def __init__(self, json_response_list):
         '''
         json_response_list: list of json responses returned from textract
@@ -959,13 +1005,7 @@ class Document:
 
     def _parse(self):
         '''
-        relationship_map: {
-            page_num: {
-                block_type: {
-                    block_id: [child_ids]
-                }
-            }
-        }
+        create a Page object for each page in this document
         '''
         self._non_line_childs = []
         self._block_map = {}  # maps block id to corresponding block
