@@ -1,3 +1,4 @@
+from collections import defaultdict
 
 class BlockType:
     PAGE = "PAGE"
@@ -746,10 +747,11 @@ class Table:
         self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
         self._id = block[ResponseKeys.ID]
         self._rows = []
-
+        self._columnIndex2Longest = defaultdict(lambda: 0) # maps column index to longest str in that column for pretty printing
         cur_row_index = 1
         row = Row()
         cell = None
+
         # looking into child_ids in this block
         if ResponseKeys.RELATIONSHIPS in block and block[ResponseKeys.RELATIONSHIPS]:
             for relationship in block[ResponseKeys.RELATIONSHIPS]:
@@ -762,16 +764,25 @@ class Table:
                             self._rows.append(row)
                             row = Row()
                             cur_row_index = cell.row_index
+                        self._columnIndex2Longest[cell.column_index] = max(len(cell.text), self._columnIndex2Longest[cell.column_index])
                         row.add_cell(cell)
                     if len(row.cells):
                         self._rows.append(row)
 
     def __str__(self):
-        s = "Table\n==========\n"
+        s = "\n\n======= Table =======\n\n"
         for row in self.rows:
-            s = s + "Row\n==========\n"
-            s = s + str(row) + "\n"
+            for cell in row.cells:
+                cell_col_index = cell.column_index
+                text_padded = cell.text + (" " * (self._columnIndex2Longest[cell_col_index]-len(cell.text)))
+                s += text_padded
+            s += "\n"
+        s += "===== End of Table =====\n\n"
         return s
+
+    def get_table_readable(self):
+        # returns table in human readable format as str
+        pass
 
     @property
     def confidence(self):
@@ -837,10 +848,10 @@ class Page:
         self._parse(block_map, non_line_childs)
 
     def __str__(self):
-        s = "Page\n*************************************\nPage Number: " + str(self.page_num) + "\n"
+        s = "\n***************** Page Number: " + str(self.page_num) + " ********************\n"
         for item in self.content:
             s += (str(item) + "\n")
-        s += "\n*************************************\n"
+        s += "\n***************** End of Page " + str(self.page_num) + " ********************\n"
         return s
 
     def _parse(self, block_map, non_line_childs):
@@ -967,10 +978,12 @@ class Document:
         doc_pages: list that contains Page objects
     }
     '''
-    def __init__(self, json_response_list):
+    def __init__(self, json_response_list, doc_name=None):
         '''
         json_response_list: list of json responses returned from textract
         '''
+        self._doc_name = doc_name
+
         if not isinstance(json_response_list, list):
             json_response_list = [json_response_list]
 
@@ -1026,10 +1039,11 @@ class Document:
             self.add_page(Page(page_num, self.get_blocks_by_page_num(page_num), self.block_map, self.non_line_childs))
 
     def __str__(self):
-        s = "\nDocument\n==========================================\n"
+        doc_header = f"Document: {self.doc_name}" if self.doc_name else "Document"
+        s = f"\n{doc_header}\n==========================================\n"
         for page in self.doc_pages:
             s += (str(page) + "\n\n")
-        s += "\n=========================================="
+        s += "\n==========================================\n"
         return s
 
     @property
@@ -1066,3 +1080,7 @@ class Document:
     @property
     def non_line_childs(self):
         return self._non_line_childs
+
+    @property
+    def doc_name(self):
+        return self._doc_name
