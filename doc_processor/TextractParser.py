@@ -1,4 +1,7 @@
 
+from collections import defaultdict
+
+
 class BlockType:
     PAGE = "PAGE"
 
@@ -787,7 +790,7 @@ class Page:
     }
     '''
 
-    def __init__(self, page_num, blocks, block_map):
+    def __init__(self, page_num, blocks, block_map, non_line_childs):
         self._blocks = blocks
         self._text = ""
         self._lines = []
@@ -796,7 +799,7 @@ class Page:
         self._content = []
         self._page_num = page_num
 
-        self._parse(block_map)
+        self._parse(block_map, non_line_childs)
 
     def __str__(self):
         s = "Page\n*************************************\nPage Number: " + str(self.page_num) + "\n"
@@ -805,9 +808,11 @@ class Page:
         s += "\n*************************************\n"
         return s
 
-    def _parse(self, block_map):
+    def _parse(self, block_map, non_line_childs):
         '''
         parse blocks list into defined objects
+
+        non_line_childs: list of child ids that belongs to table or form
         '''
         for block in self.blocks:
             block_type = block[ResponseKeys.BLOCK_TYPE]
@@ -815,10 +820,15 @@ class Page:
                 self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
                 self._id = block[ResponseKeys.ID]
             elif block_type == BlockType.LINE:
-                line = Line(block, block_map)
-                self.add_line(line)
-                self.add_content(line)
-                self._text += (line.text + '\n')
+                # if words belongs to table or form, then dont add to line object
+                if ResponseKeys.RELATIONSHIPS in block:
+                    for relationship in block[ResponseKeys.RELATIONSHIPS]:
+                        child_ids = relationship[ResponseKeys.IDs]
+                        if not all(child_id in non_line_childs for child_id in child_ids):
+                            line = Line(block, block_map)
+                            self.add_line(line)
+                            self.add_content(line)
+                            self._text += (line.text + '\n')
             elif block_type == BlockType.TABLE:
                 table = Table(block, block_map)
                 self.add_table(table)
@@ -948,18 +958,32 @@ class Document:
         self._pageNum2Blocks[cur_page_num] = cur_block_list
 
     def _parse(self):
+        '''
+        relationship_map: {
+            page_num: {
+                block_type: {
+                    block_id: [child_ids]
+                }
+            }
+        }
+        '''
+        self._non_line_childs = []
         self._block_map = {}  # maps block id to corresponding block
+
+        special_block_types = [BlockType.KEY_VALUE_SET, BlockType.SELECTION_ELEMENT, BlockType.CELL, BlockType.TABLE]
         page_nums = list(range(1, self.total_pages+1))
         for page_num in page_nums:
             blocks = self.get_blocks_by_page_num(page_num)
             for block in blocks:
                 if ResponseKeys.BLOCK_TYPE in block and ResponseKeys.ID in block:
                     self.add_block_by_id(block[ResponseKeys.ID], block)
+                    if block[ResponseKeys.BLOCK_TYPE] in special_block_types and ResponseKeys.RELATIONSHIPS in block:
+                        for relationship in block[ResponseKeys.RELATIONSHIPS]:
+                            self._non_line_childs.extend(relationship[ResponseKeys.IDs])
 
         self._doc_pages = []  # list of Page object
         for page_num in page_nums:
-            self.add_page(
-                Page(page_num, self.get_blocks_by_page_num(page_num), self.block_map))
+            self.add_page(Page(page_num, self.get_blocks_by_page_num(page_num), self.block_map, self.non_line_childs))
 
     def __str__(self):
         s = "\nDocument\n==========================================\n"
@@ -995,3 +1019,7 @@ class Document:
 
     def add_page(self, page_obj):
         self.doc_pages.append(page_obj)
+
+    @property
+    def non_line_childs(self):
+        return self._non_line_childs
