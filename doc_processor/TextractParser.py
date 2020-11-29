@@ -1060,6 +1060,9 @@ class Document:
     def add_page(self, page_obj):
         self.doc_pages.append(page_obj)
 
+    def get_page_by_page_num(self, page_num):
+        return self.doc_pages[page_num]
+
     @property
     def non_line_childs(self):
         return self._non_line_childs
