@@ -770,14 +770,14 @@ class Table:
                         self._rows.append(row)
 
     def __str__(self):
-        s = "\n\n======= Table =======\n\n"
+        s = "\n\n======= [Table] =======\n\n"
         for row in self.rows:
             for cell in row.cells:
                 cell_col_index = cell.column_index
                 text_padded = cell.text + (" " * (self._columnIndex2Longest[cell_col_index]-len(cell.text)))
                 s += text_padded
             s += "\n"
-        s += "===== End of Table =====\n\n"
+        s += "===== [End of Table] =====\n\n"
         return s
 
     def get_table_readable(self):
@@ -848,10 +848,10 @@ class Page:
         self._parse(block_map, non_line_childs)
 
     def __str__(self):
-        s = "\n***************** Page Number: " + str(self.page_num) + " ********************\n"
+        s = "\n***************** [Page Number: " + str(self.page_num) + "] ********************\n"
         for item in self.content:
             s += (str(item) + "\n")
-        s += "\n***************** End of Page " + str(self.page_num) + " ********************\n"
+        s += "\n***************** [End of Page " + str(self.page_num) + "] ********************\n"
         return s
 
     def _parse(self, block_map, non_line_childs):
@@ -1042,10 +1042,10 @@ class Document:
 
     def __str__(self):
         doc_header = f"Document: {self.doc_name}" if self.doc_name else "Document"
-        s = f"\n{doc_header}\n==========================================\n"
+        s = f"\n=================== [{doc_header}] ======================\n"
         for page in self.doc_pages:
             s += (str(page) + "\n\n")
-        s += "==========================================\n"
+        s += "==================== [End of Document] =====================\n"
         return s
 
     @property
