@@ -9,6 +9,14 @@ from io import BytesIO
 from pdf2image import convert_from_bytes
 
 
+class SupportedFiles:
+    '''
+    Enum type class for supported file formats
+    '''
+    JPEG = "jpeg"
+    JPG = "jpg"
+    PNG = "png"
+    PDF = "pdf"
 
 class ProcessType:
     '''
@@ -22,9 +30,11 @@ class ProcessType:
 class SingleDocumentProcessor:
     '''
     This class process a single s3 pdf document by converting pages into image then extract information from it
+    This class also gets information from s3 image objects
     '''
     textract = boto3.client("textract")
     pageNum2BytesArr = {} # dict mapping page number to corresponding bytes array
+    _image_mode = False # indicating whether or not we dealing with image input
 
     def __init__(self, s3_obj, process_type):
         if process_type in [ProcessType.DETECTION, ProcessType.ANALYSIS]:
@@ -32,14 +42,22 @@ class SingleDocumentProcessor:
         else:
             raise Exception(
                 f"Invalid Process Type: {process_type}\nUse only: {ProcessType.DETECTION}, {ProcessType.ANALYSIS}")
-
-        print(f"Starting Processing Document: {s3_obj.key}")
-        with tempfile.TemporaryDirectory() as temp_dir:
-            imgs = convert_from_bytes(s3_obj.get()["Body"].read(), thread_count=100,
-                                      output_folder=temp_dir, fmt="png", grayscale=True)
-            page_nums = list(range(1, len(imgs)+1))
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                executor.map(self.image_to_bytes, imgs, page_nums)
+        doc_name = s3_obj.key
+        doc_extension = doc_name.split(".")[-1].lower()
+        print(f"Starting Processing Document: {doc_name}")
+        if doc_extension == SupportedFiles.PDF:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                imgs = convert_from_bytes(s3_obj.get()["Body"].read(), thread_count=100,
+                                        output_folder=temp_dir, fmt="png", grayscale=True)
+                page_nums = list(range(1, len(imgs)+1))
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    executor.map(self.image_to_bytes, imgs, page_nums)
+        elif doc_extension in [SupportedFiles.JPEG, SupportedFiles.JPG, SupportedFiles.PNG]:
+            self._image_mode = True
+            self._bucket_name = s3_obj.bucket_name
+            self._doc_name = s3_obj.key
+        else:
+            raise Exception(f"Invalid Document Format: {doc_extension}\nUse only: {SupportedFiles.JPEG}, {SupportedFiles.JPG}, {SupportedFiles.PNG}, {SupportedFiles.PDF}")
 
     def image_to_bytes(self, img, page_num):
         '''
@@ -90,28 +108,52 @@ class SingleDocumentProcessor:
 
     def get_results(self):
         '''
-        get detection results from all pages of pdf
+        get detection results from all pages of pdf or image
 
         return:
         =================
         results: list of textract response in page number accending order
         '''
-        pageNum2Result = {}
-        max_sim_calls = 10 # max same time call allowed for aws textract
-        page_nums = list(self.pageNum2BytesArr.keys())
-        cur_page_nums_slice = page_nums[:max_sim_calls]
-        cur_right_index = max_sim_calls
-        while len(cur_page_nums_slice):
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                results = executor.map(self.get_single_page_results, cur_page_nums_slice)
-            for res in results:
-                pageNum2Result[res[0]] = res[1]
-            cur_page_nums_slice = page_nums[cur_right_index : cur_right_index+max_sim_calls]
-            cur_right_index += max_sim_calls
+        if self._image_mode:
+            response = None
+            if self.process_type == ProcessType.DETECTION:
+                response = self.textract.detect_document_text(
+                    Document={
+                        "S3Object": {
+                            "Bucket": self._bucket_name,
+                            "Name": self._doc_name
+                        }
+                    }
+                )
+            elif self.process_type == ProcessType.ANALYSIS:
+                response = self.textract.analyze_document(
+                    Document={
+                        "S3Object": {
+                            "Bucket": self._bucket_name,
+                            "Name": self._doc_name
+                        }
+                    },
+                    FeatureTypes=["TABLES", "FORMS"]
+                )
+            return [response]
+        else:
+            # pdf mode
+            pageNum2Result = {}
+            max_sim_calls = 10 # max same time call allowed for aws textract
+            page_nums = list(self.pageNum2BytesArr.keys())
+            cur_page_nums_slice = page_nums[:max_sim_calls]
+            cur_right_index = max_sim_calls
+            while len(cur_page_nums_slice):
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    results = executor.map(self.get_single_page_results, cur_page_nums_slice)
+                for res in results:
+                    pageNum2Result[res[0]] = res[1]
+                cur_page_nums_slice = page_nums[cur_right_index : cur_right_index+max_sim_calls]
+                cur_right_index += max_sim_calls
 
-        self.clear_memory()
-        results = [pageNum2Result[page_num] for page_num in sorted(list(pageNum2Result.keys()))]
-        return results
+            self.clear_memory()
+            results = [pageNum2Result[page_num] for page_num in sorted(list(pageNum2Result.keys()))]
+            return results
 
     def clear_memory(self):
         '''
