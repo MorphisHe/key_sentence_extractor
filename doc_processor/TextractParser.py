@@ -535,14 +535,13 @@ class KeyValueSet:
                                     child_block, child_block_item[ResponseKeys.IDs], block_map)
 
     def __str__(self):
-        s = "\nKey Value Set\n==========\n"
         k = ""
         v = ""
         if(self.key):
             k = str(self.key)
         if(self.value):
             v = str(self.value)
-        s = s + "Key: {}\nValue: {}".format(k, v)
+        s = "Key: {}\nValue: {}".format(k, v)
         return s
 
     @property
@@ -569,9 +568,10 @@ class Form:
         self._key_value_set_map = {}
 
     def __str__(self):
-        s = ""
+        s = "\n\n======= Form =======\n\n"
         for kv_set in self.key_value_sets:
-            s += (str(kv_set) + "\n")
+            s += (str(kv_set) + "\n\n")
+        s += "===== End of Form =====\n\n"
         return s
 
     @property
@@ -884,7 +884,9 @@ class Page:
                     kv_set = KeyValueSet(block, block_map)
                     if kv_set.key:
                         self.form.add_key_val_set(kv_set)
-                        self.add_content(kv_set)
+                        #self.add_content(kv_set)
+        if len(self.form.key_value_sets):
+            self.add_content(self.form)
 
     def get_lines_readable(self):
         '''
@@ -1043,7 +1045,7 @@ class Document:
         s = f"\n{doc_header}\n==========================================\n"
         for page in self.doc_pages:
             s += (str(page) + "\n\n")
-        s += "\n==========================================\n"
+        s += "==========================================\n"
         return s
 
     @property
