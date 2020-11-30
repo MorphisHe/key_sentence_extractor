@@ -43,6 +43,7 @@ class ResponseKeys:
     DOCUMENT_METADATA = "DocumentMetadata"
     PAGES = "Pages"
 
+MIN_CONFIDENCE = 95.0
 
 '''
 ========================================
@@ -255,15 +256,15 @@ class Line:
         self._confidence = block[ResponseKeys.CONFIDENCE]
         self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
         self._id = block[ResponseKeys.ID]
-        self._text = "" if not block[ResponseKeys.TEXT] else block[ResponseKeys.TEXT]
 
         self._words = []
         if ResponseKeys.RELATIONSHIPS in block and block[ResponseKeys.RELATIONSHIPS]:
             for relationship in block[ResponseKeys.RELATIONSHIPS]:
                 if relationship[ResponseKeys.TYPE] == ResponseKeys.TYPE_CHILD:
                     for child_id in relationship[ResponseKeys.IDs]:
-                        if block_map[child_id][ResponseKeys.BLOCK_TYPE] == BlockType.WORD:
+                        if block_map[child_id][ResponseKeys.BLOCK_TYPE] == BlockType.WORD and block_map[child_id][ResponseKeys.CONFIDENCE] >= MIN_CONFIDENCE:
                             self._words.append(Word(block_map[child_id]))
+        self._text = " ".join([word.text for word in self._words])
 
     def __str__(self):
         return self.text
