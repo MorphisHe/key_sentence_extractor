@@ -32,8 +32,8 @@ class SingleDocumentProcessor:
     This class process a single s3 pdf document by converting pages into image then extract information from it
     This class also gets information from s3 image objects
     '''
-    textract = boto3.client("textract")
-    pageNum2BytesArr = {} # dict mapping page number to corresponding bytes array
+    _textract = boto3.client("textract")
+    _pageNum2BytesArr = {} # dict mapping page number to corresponding bytes array
     _image_mode = False # indicating whether or not we dealing with image input
 
     def __init__(self, s3_obj, process_type):
@@ -51,7 +51,7 @@ class SingleDocumentProcessor:
                                         output_folder=temp_dir, fmt="png", grayscale=True)
                 page_nums = list(range(1, len(imgs)+1))
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    executor.map(self.image_to_bytes, imgs, page_nums)
+                    executor.map(self._image_to_bytes, imgs, page_nums)
         elif doc_extension in [SupportedFiles.JPEG, SupportedFiles.JPG, SupportedFiles.PNG]:
             self._image_mode = True
             self._bucket_name = s3_obj.bucket_name
@@ -59,7 +59,7 @@ class SingleDocumentProcessor:
         else:
             raise Exception(f"Invalid Document Format: {doc_extension}\nUse only: {SupportedFiles.JPEG}, {SupportedFiles.JPG}, {SupportedFiles.PNG}, {SupportedFiles.PDF}")
 
-    def image_to_bytes(self, img, page_num):
+    def _image_to_bytes(self, img, page_num):
         '''
         converts image to bytes
 
@@ -74,7 +74,7 @@ class SingleDocumentProcessor:
         self.pageNum2BytesArr[page_num] = byte_arr.getvalue()
         print(f"Done Converting Page #: {page_num}")
 
-    def get_single_page_results(self, page_num):
+    def _get_single_page_results(self, page_num):
         '''
         get the detection result of a single page
 
@@ -114,7 +114,7 @@ class SingleDocumentProcessor:
         =================
         results: list of textract response in page number accending order
         '''
-        if self._image_mode:
+        if self.image_mode:
             response = None
             if self.process_type == ProcessType.DETECTION:
                 response = self.textract.detect_document_text(
@@ -145,21 +145,33 @@ class SingleDocumentProcessor:
             cur_right_index = max_sim_calls
             while len(cur_page_nums_slice):
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    results = executor.map(self.get_single_page_results, cur_page_nums_slice)
+                    results = executor.map(self._get_single_page_results, cur_page_nums_slice)
                 for res in results:
                     pageNum2Result[res[0]] = res[1]
                 cur_page_nums_slice = page_nums[cur_right_index : cur_right_index+max_sim_calls]
                 cur_right_index += max_sim_calls
 
-            self.clear_memory()
+            self.__clear_memory()
             results = [pageNum2Result[page_num] for page_num in sorted(list(pageNum2Result.keys()))]
             return results
 
-    def clear_memory(self):
+    def __clear_memory(self):
         '''
         free the memory of current object
         '''
-        self.pageNum2BytesArr = {}
+        self._pageNum2BytesArr = {}
+    
+    @property
+    def textract(self):
+        return self._textract
+
+    @property
+    def pageNum2BytesArr(self):
+        return self._pageNum2BytesArr
+    
+    @property
+    def image_mode(self):
+        return self._image_mode
 
 
 
@@ -169,7 +181,7 @@ class BatchDocumentProcessor:
     This class able to process multiple s3 documents using multithreads
     '''
 
-    textract = boto3.client("textract")
+    _textract = boto3.client("textract")
     job_ids = []
     jobId2DocName = {} # map job_id to document name
     jobId2ProcessType = {} # map job_id to process type
@@ -222,7 +234,7 @@ class BatchDocumentProcessor:
                     f"Invalid Process Type: {process_type}\nUse only: {ProcessType.DETECTION}, {ProcessType.ANALYSIS}")
 
 
-    def check_job_status(self, job_id):
+    def _check_job_status(self, job_id):
         '''
         Listen to textract job with job_id
 
@@ -253,7 +265,7 @@ class BatchDocumentProcessor:
         return (job_id, status)
 
 
-    def get_single_doc_results(self, job_id, status):
+    def _get_single_doc_results(self, job_id, status):
         '''
         Extract responses from a finished job
 
@@ -261,7 +273,7 @@ class BatchDocumentProcessor:
         =================
         job_id: job_id of the textract job to get results
 
-        status: status of the response from check_job_status function
+        status: status of the response from _check_job_status function
 
         Return:
         =================
@@ -300,7 +312,7 @@ class BatchDocumentProcessor:
         # listen to job status using multithreading
         with concurrent.futures.ThreadPoolExecutor() as executor:
             # reuslts is list of tuples (job_id, status)
-            results = executor.map(self.check_job_status, self.job_ids)
+            results = executor.map(self._check_job_status, self.job_ids)
 
         job_id_list = []
         status_list = []
@@ -311,15 +323,15 @@ class BatchDocumentProcessor:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             # reuslts is list of tuples (job_id, res_list)
             # res_list contains multiple response for job_id
-            results = executor.map(self.get_single_doc_results, job_id_list, status_list)
+            results = executor.map(self._get_single_doc_results, job_id_list, status_list)
 
         docName2Result = {self.jobId2DocName[result[0]] : result[1] for result in results}
         print("All Done")
-        self.clear_memory()
+        self._clear_memory()
 
         return docName2Result
     
-    def clear_memory(self):
+    def _clear_memory(self):
         '''
         Clears memory of current object
         '''
@@ -329,5 +341,7 @@ class BatchDocumentProcessor:
         self.jobId2TextractFunc = {}
         self.jobId2ResponseList = {}
 
-    
+    @property
+    def textract(self):
+        return self._textract    
 
