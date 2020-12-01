@@ -1,9 +1,5 @@
 from collections import defaultdict
 
-from botocore.utils import percent_encode
-from numpy.lib.function_base import percentile
-
-
 class BlockType:
     PAGE = "PAGE"
 
