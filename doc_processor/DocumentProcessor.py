@@ -139,7 +139,7 @@ class SingleDocumentProcessor:
         else:
             # pdf mode
             pageNum2Result = {}
-            max_sim_calls = 10 # max same time call allowed for aws textract
+            max_sim_calls = 5 # max same time call allowed for aws textract
             page_nums = list(self.pageNum2BytesArr.keys())
             cur_page_nums_slice = page_nums[:max_sim_calls]
             cur_right_index = max_sim_calls
