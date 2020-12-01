@@ -1,5 +1,9 @@
 from collections import defaultdict
 
+from botocore.utils import percent_encode
+from numpy.lib.function_base import percentile
+
+
 class BlockType:
     PAGE = "PAGE"
 
@@ -42,6 +46,7 @@ class ResponseKeys:
 
     DOCUMENT_METADATA = "DocumentMetadata"
     PAGES = "Pages"
+
 
 MIN_CONFIDENCE = 95.0
 
@@ -294,6 +299,208 @@ class Line:
         return self._block
 
 
+
+class Paragraph:
+    '''
+    Struct
+    ==============
+    ### Paragraph: {
+        lines: list of line object
+        text: text representation of this paragraph
+        bounding_box: bounding box of this paragraph (union of line bounding boxes)
+    }
+    '''
+    def __init__(self, lines, bbox):
+        '''
+        lines: list of line objects
+
+        bbox: bounding box of this paragraph
+        '''
+        self._lines = lines
+        self._bounding_box = bbox
+        self._text = ""
+
+        for line in lines:
+            self._text += (line.text + '\n')
+
+    def __str__(self):
+        s = "\n--------- Paragraph ---------\n\n" + \
+            self.text + "\n----- [End of Paragraph] -----\n"
+        return s
+
+    @property
+    def text(self):
+        return self._text
+
+    @property
+    def lines(self):
+        return self._lines
+
+    @property
+    def bounding_box(self):
+        return self._bounding_box
+
+
+class ParagraphConstructor:
+    '''
+    this is a pipeline class that creates Paragraph objects with list of Line objects
+    '''
+
+    def __init__(self, lines):
+        '''
+        lines: list of Line object
+        '''
+        from numpy import percentile
+        self._percentile = percentile
+        columnIndex2Lines = self._line_readable(lines)
+        columnIndex2Bounds = self._vertical_dist_outliers(columnIndex2Lines)
+        self._create_paragraph(columnIndex2Lines, columnIndex2Bounds)
+
+    def _line_readable(self, lines):
+        '''
+        this method parses list of lines into human readble order (column detection)
+
+        lines: list of Line object
+        '''
+        columns = []
+        # maps column index to all lines belong to that column
+        columnIndex2Lines = defaultdict(list)
+
+        for line in lines:
+            column_found = False
+            for index, column in enumerate(columns):
+                # get bbox centre and column centre
+                bbox_left = line.geometry.bounding_box.left
+                bbox_right = line.geometry.bounding_box.left + line.geometry.bounding_box.width
+                bbox_centre = line.geometry.bounding_box.left + line.geometry.bounding_box.width/2
+                column_centre = column['left'] + column['right']/2
+                if (bbox_centre > column['left'] and bbox_centre < column['right']) or (column_centre > bbox_left and column_centre < bbox_right):
+                    # Bbox appears inside the column
+                    columnIndex2Lines[index].append(line)
+                    column_found = True
+                    break
+            if not column_found:
+                columns.append({'left': line.geometry.bounding_box.left,
+                                'right': line.geometry.bounding_box.left + line.geometry.bounding_box.width})
+                columnIndex2Lines[len(columns)-1].append(line)
+
+        return columnIndex2Lines
+
+    def _get_vertical_dist(self, line_top, line_bottom):
+        '''
+        returns the ratio of vertical distance between 2 line object
+
+        line_top: line object thats on the top location corresponding to line_bottom
+
+        line_bottom: line object thats on the bottom location corresponding to line_top
+        '''
+        bbox_top = line_top.geometry.bounding_box
+        bbox_bottom = line_bottom.geometry.bounding_box
+
+        bottom_of_bbox_top = bbox_top.top + bbox_top.height
+        top_of_bbox_bottom = bbox_bottom.top
+
+        vertical_dif = top_of_bbox_bottom - bottom_of_bbox_top  # float
+        return vertical_dif
+
+    def _vertical_dist_outliers(self, columnIndex2Lines):
+        '''
+        calculates vertical distance between 2 lines in a column. calculate the lower bound
+        and upper bound for outliers using IQR
+
+        columnIndex2Lines: dict that maps column index to all lines belong to that column
+        '''
+        columnIndex2Bounds = {}  # maps column index to tuple (vert_dist_list, lower_lim, upper_lim)
+
+        column_indexes = sorted(list(columnIndex2Lines.keys()))
+        for column_index in column_indexes:
+            lines = columnIndex2Lines[column_index]
+            prev_line = None
+            vert_dist_list = []  # index x contains vertical dist of line x and line x+1
+            for line in lines:
+                if prev_line:
+                    vert_dif = self._get_vertical_dist(prev_line, line)
+                    prev_line = line
+                    vert_dist_list.append(vert_dif)
+                else:
+                    prev_line = line
+
+            # calculating IQR and outlier bounds
+            Q1, Q3 = self._percentile(vert_dist_list, [25, 75])
+            IQR = Q3 - Q1
+            lower_lim = Q1 - 1.5 * IQR
+            upper_lim = Q3 + 1.5 * IQR
+
+            columnIndex2Bounds[column_index] = (
+                vert_dist_list, lower_lim, upper_lim)
+
+        return columnIndex2Bounds
+
+    def _create_paragraph(self, columnIndex2Lines, columnIndex2Bounds):
+        self.paragraphs = []
+        column_indexes = sorted(list(columnIndex2Lines.keys()))
+        for column_index in column_indexes:
+            lines = columnIndex2Lines[column_index]
+            vert_dist_list, lower_lim, upper_lim = columnIndex2Bounds[column_index]
+
+            cur_paragraph_lines = []
+            paragraph_bbox = {
+                "Left": 1.0,
+                "Top": 0.0,
+                "Width": 0.0,
+                "Height": 0.0
+            }
+
+            for block_index in range(len(lines)):
+                cur_line = lines[block_index]
+                vert_dist_index = block_index - 1
+                if vert_dist_index >= 0:
+                    vert_dist = vert_dist_list[vert_dist_index]
+                    # check if outlier detected, truncate the lines into paragraph
+                    if (vert_dist > upper_lim) or (vert_dist < lower_lim):
+                        # last line of the detected paragraph
+                        last_line = cur_paragraph_lines[-1]
+                        # first line of the detected paragraph
+                        first_line = cur_paragraph_lines[0]
+                        paragraph_bbox["Height"] = (
+                            last_line.geometry.bounding_box.top + last_line.geometry.bounding_box.height) - first_line.geometry.bounding_box.top
+                        self.paragraphs.append(Paragraph(cur_paragraph_lines, BoundingBox(
+                            paragraph_bbox["Width"], paragraph_bbox["Height"], paragraph_bbox["Left"], paragraph_bbox["Top"])))
+
+                        # reset variables
+                        paragraph_bbox = {
+                            "Left": 1.0,
+                            "Top": cur_line.geometry.bounding_box.top,
+                            "Width": 0.0,
+                            "Height": 0.0
+                        }
+                        cur_paragraph_lines = []
+                    else:
+                        # update bbox
+                        paragraph_bbox["Left"] = min(
+                            paragraph_bbox["Left"], cur_line.geometry.bounding_box.left)
+                        paragraph_bbox["Width"] = max(
+                            paragraph_bbox["Width"], cur_line.geometry.bounding_box.width)
+                else:
+                    paragraph_bbox["Top"] = cur_line.geometry.bounding_box.top
+                    paragraph_bbox["Left"] = min(
+                        paragraph_bbox["Left"], cur_line.geometry.bounding_box.left)
+                    paragraph_bbox["Width"] = max(
+                        paragraph_bbox["Width"], cur_line.geometry.bounding_box.width)
+
+                cur_paragraph_lines.append(cur_line)
+
+            # finish creating last paragraph in this column
+            last_line = cur_paragraph_lines[-1]
+            first_line = cur_paragraph_lines[0]
+            paragraph_bbox["Height"] = (last_line.geometry.bounding_box.top +
+                                        last_line.geometry.bounding_box.height) - first_line.geometry.bounding_box.top
+            self.paragraphs.append(Paragraph(cur_paragraph_lines, BoundingBox(
+                paragraph_bbox["Width"], paragraph_bbox["Height"], paragraph_bbox["Left"], paragraph_bbox["Top"])))
+
+
+
+
 '''
 ========================================
 =                 FORM                 =
@@ -372,7 +579,7 @@ class FieldKey:
     def __init__(self, block, child_ids, block_map):
         '''
         block: textract block object with block type "KeyValueSet" and entity type of "KEY"
-    
+
         child_ids: list of child ids
 
         block_map: dict that maps block_id to block object
@@ -453,7 +660,7 @@ class FieldValue:
     def __init__(self, block, child_ids, block_map):
         '''
         block: textract block object with block type "KeyValueSet" and entity type of "VALUE"
-    
+
         child_ids: list of child ids
 
         block_map: dict that maps block_id to block object
@@ -748,7 +955,8 @@ class Table:
         self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
         self._id = block[ResponseKeys.ID]
         self._rows = []
-        self._columnIndex2Longest = defaultdict(lambda: 0) # maps column index to longest str in that column for pretty printing
+        # maps column index to longest str in that column for pretty printing
+        self._columnIndex2Longest = defaultdict(lambda: 0)
         cur_row_index = 1
         row = Row()
         cell = None
@@ -765,7 +973,8 @@ class Table:
                             self._rows.append(row)
                             row = Row()
                             cur_row_index = cell.row_index
-                        self._columnIndex2Longest[cell.column_index] = max(len(cell.text), self._columnIndex2Longest[cell.column_index])
+                        self._columnIndex2Longest[cell.column_index] = max(
+                            len(cell.text), self._columnIndex2Longest[cell.column_index])
                         row.add_cell(cell)
                     if len(row.cells):
                         self._rows.append(row)
@@ -775,7 +984,9 @@ class Table:
         for row in self.rows:
             for cell in row.cells:
                 cell_col_index = cell.column_index
-                text_padded = cell.text + (" " * (self._columnIndex2Longest[cell_col_index]-len(cell.text)))
+                text_padded = cell.text + \
+                    (" " *
+                     (self._columnIndex2Longest[cell_col_index]-len(cell.text)))
                 s += text_padded
             s += "\n"
         s += "===== [End of Table] =====\n\n"
@@ -820,6 +1031,7 @@ class Page:
     ### Page: {
         blocks: textract blocks list (contains all blocks in a page)
         lines: list of line objects
+        paragraphs: list of paragraph object
         form: form object
         tables: list of table object
         content: (line, form, table) objects in same order as block show up in textract response
@@ -849,10 +1061,12 @@ class Page:
         self._parse(block_map, non_line_childs)
 
     def __str__(self):
-        s = "\n***************** [Page Number: " + str(self.page_num) + "] ********************\n"
+        s = "\n***************** [Page Number: " + \
+            str(self.page_num) + "] ********************\n"
         for item in self.content:
             s += (str(item) + "\n")
-        s += "\n***************** [End of Page " + str(self.page_num) + "] ********************\n"
+        s += "\n***************** [End of Page " + \
+            str(self.page_num) + "] ********************\n"
         return s
 
     def _parse(self, block_map, non_line_childs):
@@ -874,8 +1088,8 @@ class Page:
                         if not all(child_id in non_line_childs for child_id in child_ids):
                             line = Line(block, block_map)
                             self.add_line(line)
-                            self.add_content(line)
-                            self._text += (line.text + '\n')
+                            # self.add_content(line)
+                            # self._text += (line.text + '\n')
             elif block_type == BlockType.TABLE:
                 table = Table(block, block_map)
                 self.add_table(table)
@@ -885,44 +1099,14 @@ class Page:
                     kv_set = KeyValueSet(block, block_map)
                     if kv_set.key:
                         self.form.add_key_val_set(kv_set)
-                        #self.add_content(kv_set)
+                        # self.add_content(kv_set)
         if len(self.form.key_value_sets):
             self.add_content(self.form)
 
-    def get_lines_readable(self):
-        '''
-        TODO
-        return lines of current page in readable order (column and row organized)
-        '''
-        columns = []
-        lines = []
-        for item in self.lines:
-            column_found = False
-            for index, column in enumerate(columns):
-                bbox_left = item.geometry.bounding_box.left
-                bbox_right = item.geometry.bounding_box.left + item.geometry.bounding_box.width
-                bbox_centre = item.geometry.bounding_box.left + item.geometry.bounding_box.width/2
-                column_centre = column['left'] + column['right']/2
-                if (bbox_centre > column['left'] and bbox_centre < column['right']) or (column_centre > bbox_left and column_centre < bbox_right):
-                    # Bbox appears inside the column
-                    lines.append([index, item.text])
-                    column_found = True
-                    break
-            if not column_found:
-                columns.append({'left': item.geometry.bounding_box.left,
-                                'right': item.geometry.bounding_box.left + item.geometry.bounding_box.width})
-                lines.append([len(columns)-1, item.text])
-
-        lines.sort(key=lambda x: x[0])
-        return lines
-
-    def get_text_readable(self):
-        # TODO
-        lines = self.get_lines_readable()
-        text = ""
-        for line in lines:
-            text = text + line[1] + '\n'
-        return text
+        # parse lines to paragraphs
+        self._paragraphs = ParagraphConstructor(self.lines).paragraphs
+        # concat paragraphs and other contents
+        self._content = self._paragraphs + self._content
 
     @property
     def blocks(self):
@@ -935,6 +1119,10 @@ class Page:
     @property
     def lines(self):
         return self._lines
+
+    @property
+    def paragraphs(self):
+        return self._paragraphs
 
     @property
     def form(self):
@@ -981,6 +1169,7 @@ class Document:
         doc_pages: list that contains Page objects
     }
     '''
+
     def __init__(self, json_response_list, doc_name=None):
         '''
         json_response_list: list of json responses returned from textract
@@ -1026,7 +1215,8 @@ class Document:
         self._non_line_childs = []
         self._block_map = {}  # maps block id to corresponding block
 
-        special_block_types = [BlockType.KEY_VALUE_SET, BlockType.SELECTION_ELEMENT, BlockType.CELL, BlockType.TABLE]
+        special_block_types = [BlockType.KEY_VALUE_SET,
+                               BlockType.SELECTION_ELEMENT, BlockType.CELL, BlockType.TABLE]
         page_nums = list(range(1, self.total_pages+1))
         for page_num in page_nums:
             blocks = self.get_blocks_by_page_num(page_num)
@@ -1035,11 +1225,13 @@ class Document:
                     self.add_block_by_id(block[ResponseKeys.ID], block)
                     if block[ResponseKeys.BLOCK_TYPE] in special_block_types and ResponseKeys.RELATIONSHIPS in block:
                         for relationship in block[ResponseKeys.RELATIONSHIPS]:
-                            self._non_line_childs.extend(relationship[ResponseKeys.IDs])
+                            self._non_line_childs.extend(
+                                relationship[ResponseKeys.IDs])
 
         self._doc_pages = []  # list of Page object
         for page_num in page_nums:
-            self.add_page(Page(page_num, self.get_blocks_by_page_num(page_num), self.block_map, self.non_line_childs))
+            self.add_page(Page(page_num, self.get_blocks_by_page_num(
+                page_num), self.block_map, self.non_line_childs))
 
     def __str__(self):
         doc_header = f"Document: {self.doc_name}" if self.doc_name else "Document"
