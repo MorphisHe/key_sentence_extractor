@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+
 class BlockType:
     PAGE = "PAGE"
 
@@ -324,7 +325,7 @@ class Paragraph:
         '''
         self._lines = lines
         self._text = ""
-        
+
         # construct the geometry and text for this paragraph
         paragraph_bbox = {
             # this is currently right instead of width, have to minus left value at the end
@@ -339,7 +340,8 @@ class Paragraph:
             # update bbox
             paragraph_bbox["Left"] = min(
                 paragraph_bbox["Left"], line.geometry.bounding_box.left)
-            paragraph_bbox["Width"] = max(paragraph_bbox["Width"], line.geometry.bounding_box.left + line.geometry.bounding_box.width)
+            paragraph_bbox["Width"] = max(
+                paragraph_bbox["Width"], line.geometry.bounding_box.left + line.geometry.bounding_box.width)
         # minus left to get width value
         paragraph_bbox["Width"] -= paragraph_bbox["Left"]
 
@@ -389,7 +391,8 @@ class ParagraphConstructor:
         vert_dist_list = self._get_vertical_dist(new_lines)
 
         # construct paragraphs
-        self._create_paragraph(new_lines, vert_dist_list, upper_lim=self.VERTICAL_DIST_TOLERANCE)
+        self._create_paragraph(new_lines, vert_dist_list,
+                               upper_lim=self.VERTICAL_DIST_TOLERANCE)
 
     def _check_vertically_overlap(self, line, column):
         '''
@@ -425,11 +428,11 @@ class ParagraphConstructor:
                            Column index is sorted by position of column on document.
                            (upper left the smallest)
         '''
-        columns = [] # [column, [lines]]
+        columns = []  # [column, [lines]]
         for line in lines:
             ll = line.geometry.bounding_box.left  # line left
             lr = ll + line.geometry.bounding_box.width  # line right
-            
+
             column_overlap_count = 0
             for item in columns:
                 if self._check_vertically_overlap(line, item[0]):
@@ -522,7 +525,8 @@ class ParagraphConstructor:
             prev_line = lines[0]
             for line in lines[1:]:
                 if self._check_items_same_line(prev_line, line):
-                    horizontal_dist = self._get_dist(prev_line, line, mode=self.HORIZONTAL_DIST_MODE)
+                    horizontal_dist = self._get_dist(
+                        prev_line, line, mode=self.HORIZONTAL_DIST_MODE)
                     if horizontal_dist <= self.HORIZONTAL_DIST_TOLERANCE:
                         # merge 2 lines
                         merged_text = prev_line.text + " " + line.text
@@ -605,10 +609,10 @@ class ParagraphConstructor:
         Parameters:
         =================
         lines: list of line objects
-        
+
         vert_dist_list: list of vertical distance between 2 line object.
                         this list has length of len(lines)-1
-        
+
         upper_lim: vertical distance tolerance. If 2 line object has vertical
                    distance >= upper_lim, then we chunck the lines into 2 paragraphs.
         '''
@@ -635,16 +639,15 @@ class ParagraphConstructor:
                         self.paragraphs.append(
                             Paragraph(columnIndex2Lines[column_index]))
                     cur_paragraph_lines = []
-                
+
             prev_line = cur_line
             cur_paragraph_lines.append(cur_line)
-        
+
         # finish creating last paragraph
         columnIndex2Lines = self._get_line_readable(cur_paragraph_lines)
         column_indexes = sorted(list(columnIndex2Lines.keys()))
         for column_index in column_indexes:
             self.paragraphs.append(Paragraph(columnIndex2Lines[column_index]))
-        
 
 
 '''
@@ -1259,7 +1262,7 @@ class Page:
             self._paragraphs = ParagraphConstructor(self.lines).paragraphs
             # concat paragraphs and other contents
             self._content = self._paragraphs + self._content
-        
+
         for paragraph in self._paragraphs:
             self._text += (paragraph.text + "\n")
 
@@ -1278,6 +1281,10 @@ class Page:
     @property
     def paragraphs(self):
         return self._paragraphs
+
+    @paragraphs.setter
+    def paragraph(self, value):
+        self._paragraphs = value
 
     @property
     def form(self):
@@ -1346,13 +1353,20 @@ class Document:
     }
     '''
 
-    def __init__(self, json_response_list, doc_name=None):
+    # threshold to discard a paragraph
+    NON_CHAR_THRESHOLD = 0.5  # non char percentage
+    SINGLE_CHAR_WORD_THRESHOLD = 0.5  # single char percentage
+    NUM_WORD_THRESHOLD = 15  # min number of words in paragraph
+
+    def __init__(self, json_response_list, doc_name=None, parse_para=False):
         '''
         Parameters:
         =================
         json_response_list: list of json responses returned from textract
 
         doc_name: name of current document
+
+        parse_para: default False, set to True if want to parse paragraph. refer to parse_paragraph() function for detail
         '''
         self._doc_name = doc_name
 
@@ -1364,8 +1378,13 @@ class Document:
 
         # organize json by page
         self._organize_by_page(json_response_list)
+
         # parse each page
         self._parse()
+
+        # parse paragraphs
+        if parse_para:
+            self.parse_paragraphs()
 
     def _organize_by_page(self, json_response_list):
         '''
@@ -1423,6 +1442,95 @@ class Document:
         s += "==================== [End of Document] =====================\n"
         return s
 
+    def check_discard_chunk(self, item, mode, num_word_threshold, non_char_threshold, single_char_threshold):
+        '''
+        check if a item should be discarded base on portion of non
+        alphabet chars in the text. portion of single char words.
+
+        Parameters:
+        =================
+        item: object that has text property
+
+        mode:
+
+            - "non_char": discard paragraph by percentage of non char characters
+            - "single_char": discard paragraph by percentage of single char words
+            - "min_word_count": discard paragraph if word_count < min_word_count
+
+        num_word_threshold: default 15, used to determind whether a paragraph should be discarded if len(words) < threshold
+
+        non_char_threshold: default 0.5, used to determind whether a paragraph
+                            should be discarded base on percentage of not alphabet chars.
+
+        single_char_threshold: default 0.5, used to determind whether a paragraph
+                               should be discarded based on percentage of single
+                               char words.
+
+        Return:
+        =================
+        boolean: True if this item is to be discarded, False otherwise.
+        '''
+        char_threshold = self.NON_CHAR_THRESHOLD if not non_char_threshold else non_char_threshold
+        single_threshold = self.NON_CHAR_THRESHOLD if not single_char_threshold else single_char_threshold
+        word_count_threshold = self.NUM_WORD_THRESHOLD if not num_word_threshold else num_word_threshold
+
+        single_char_word = 0
+        total_word = 0
+
+        not_char_count = 0
+        total_char = 0
+
+        for word in item.text.split():
+            if "single_char" in mode:
+                if len(word) == 1:
+                    single_char_word += 1
+                total_word += 1
+
+            if "non_char" in mode:
+                for char in word:
+                    if not char.isalpha():
+                        not_char_count += 1
+                    total_char += 1
+
+        if "min_word_count" in mode and total_word < word_count_threshold:
+            return True
+
+        # zero division handling
+        total_word = total_word if total_word else 1
+        total_char = total_char if total_char else 1
+        return ((not_char_count/total_char > char_threshold) or (single_char_word/total_word > single_threshold))
+
+    def parse_paragraphs(self, mode=["non_char", "single_char", "min_word_count"], num_word_threshold=None, non_char_threshold=None, single_char_threshold=None):
+        '''
+        parse paragraphs by modes:
+
+            - "non_char": discard paragraph by percentage of non char characters
+            - "single_char": discard paragraph by percentage of single char words
+            - "min_word_count": discard paragraph if word_count < min_word_count
+
+        Parameters:
+        =================
+        mode: modes of detection
+
+        num_word_threshold: default 15, used to determind whether a paragraph should be discarded if len(words) < threshold
+
+        non_char_threshold: default 0.5, used to determind whether a paragraph
+                            should be discarded base on percentage of not alphabet chars.
+
+        single_char_threshold: default 0.5, used to determind whether a paragraph
+                               should be discarded based on percentage of single
+                               char words.
+        '''
+        for page_obj in self.doc_pages:
+            new_paragraphs = []
+            for paragraph in page_obj.paragraphs:
+                # non char filter
+                if self.check_discard_chunk(paragraph, mode, num_word_threshold, non_char_threshold, single_char_threshold):
+                    continue
+                new_paragraphs.append(paragraph)
+
+            page_obj._paragraphs = new_paragraphs
+
     @property
     def total_pages(self):
         return self._total_pages
@@ -1472,7 +1580,17 @@ class Document:
         =================
         page_obj: a page object
         '''
-        self.doc_pages.append(page_obj)
+        self._doc_pages.append(page_obj)
+
+    def delete_page(self, index):
+        '''
+        delete a page from doc_pages list with index
+
+        Parameters:
+        =================
+        index: index to delete from list
+        '''
+        del self._doc_pages[index]
 
     def get_page_by_page_num(self, page_num):
         '''
