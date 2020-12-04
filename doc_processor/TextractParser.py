@@ -508,7 +508,7 @@ class ParagraphConstructor:
 
     def _merge_line(self, lines):
         '''
-        merge all line that belongs to same line location
+        merge all line that belongs to same horizontal location
 
         Parameters:
         =================
@@ -527,14 +527,18 @@ class ParagraphConstructor:
                 if self._check_items_same_line(prev_line, line):
                     horizontal_dist = self._get_dist(
                         prev_line, line, mode=self.HORIZONTAL_DIST_MODE)
-                    if horizontal_dist <= self.HORIZONTAL_DIST_TOLERANCE:
+                    if horizontal_dist > 0.0 and horizontal_dist <= self.HORIZONTAL_DIST_TOLERANCE:
                         # merge 2 lines
                         merged_text = prev_line.text + " " + line.text
                         merged_geometry = self._merge_geometry(
                             prev_line.geometry, line.geometry)
+
                         prev_line.text = merged_text
                         prev_line.geometry = merged_geometry
                         prev_line.words = prev_line.words + line.words
+                    else:
+                        new_lines.append(prev_line)
+                        prev_line = line
                 else:
                     new_lines.append(prev_line)
                     prev_line = line
@@ -648,8 +652,14 @@ class ParagraphConstructor:
         column_indexes = sorted(list(columnIndex2Lines.keys()))
         for column_index in column_indexes:
             self.paragraphs.append(Paragraph(columnIndex2Lines[column_index]))
-
-
+        
+        '''
+        prev_p = self.paragraphs[0]
+        for paragraph in self.paragraphs[1:]:
+            print("Dist", self._get_dist(prev_p, paragraph, self.VERTICAL_DIST_MODE))
+            print(prev_p.text)
+            prev_p = paragraph
+        '''
 '''
 ========================================
 =                 FORM                 =
