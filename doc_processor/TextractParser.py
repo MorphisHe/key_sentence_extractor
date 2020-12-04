@@ -1219,7 +1219,11 @@ class Page:
         '''
         parse blocks list into defined objects
 
+        Parameters:
+        =================
         non_line_childs: list of child ids that belongs to table or form
+
+        block_map: dict that maps block id to block object
         '''
         for block in self.blocks:
             block_type = block[ResponseKeys.BLOCK_TYPE]
@@ -1300,12 +1304,33 @@ class Page:
         return self._page_num
 
     def add_line(self, line):
+        '''
+        add line to lines list
+
+        Parameters:
+        =================
+        line: line object
+        '''
         self.lines.append(line)
 
     def add_content(self, item):
+        '''
+        add item to content list
+
+        Parameters:
+        =================
+        item: any object defined above
+        '''
         self.content.append(item)
 
     def add_table(self, table):
+        '''
+        add table to tables list
+
+        Parameters:
+        =================
+        table: table object
+        '''
         self.tables.append(table)
 
 
@@ -1323,7 +1348,11 @@ class Document:
 
     def __init__(self, json_response_list, doc_name=None):
         '''
+        Parameters:
+        =================
         json_response_list: list of json responses returned from textract
+
+        doc_name: name of current document
         '''
         self._doc_name = doc_name
 
@@ -1342,6 +1371,8 @@ class Document:
         '''
         create a dict that maps page_num to all blocks that belongs to that page
 
+        Parameters:
+        =================
         json_response_list: list of json response returned by textract
         '''
         blocks_concat = []
@@ -1401,6 +1432,13 @@ class Document:
         return self._pageNum2Blocks
 
     def get_blocks_by_page_num(self, page_num):
+        '''
+        get list of blocks by page number
+
+        Parameters:
+        =================
+        page_num: (int) page number of blocks you want to get
+        '''
         if page_num in self.pageNum2Blocks.keys():
             return self.pageNum2Blocks[page_num]
         else:
@@ -1411,6 +1449,15 @@ class Document:
         return self._block_map
 
     def add_block_by_id(self, block_id, block):
+        '''
+        add key value pair (block_id, block) to block_map
+
+        Parameters:
+        =================
+        block_id: id of current block
+
+        block: block object
+        '''
         self.block_map[block_id] = block
 
     @property
@@ -1418,9 +1465,23 @@ class Document:
         return self._doc_pages
 
     def add_page(self, page_obj):
+        '''
+        add page object to doc_pages list
+
+        Parameters:
+        =================
+        page_obj: a page object
+        '''
         self.doc_pages.append(page_obj)
 
     def get_page_by_page_num(self, page_num):
+        '''
+        get page object by page number
+
+        Parameters:
+        =================
+        page_num: (int) page number of page object you want to get
+        '''
         return self.doc_pages[page_num]
 
     @property
