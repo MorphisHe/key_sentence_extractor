@@ -278,6 +278,10 @@ class Line:
     def geometry(self):
         return self._geometry
 
+    @geometry.setter
+    def geometry(self, value):
+        self._geometry = value
+
     @property
     def id(self):
         return self._id
@@ -286,14 +290,21 @@ class Line:
     def words(self):
         return self._words
 
+    @words.setter
+    def words(self, value):
+        self._words = value
+
     @property
     def text(self):
         return self._text
 
+    @text.setter
+    def text(self, value):
+        self._text = value
+
     @property
     def block(self):
         return self._block
-
 
 
 class Paragraph:
@@ -306,18 +317,36 @@ class Paragraph:
         bounding_box: bounding box of this paragraph (union of line bounding boxes)
     }
     '''
-    def __init__(self, lines, bbox):
+
+    def __init__(self, lines):
         '''
         lines: list of line objects
-
-        bbox: bounding box of this paragraph
         '''
         self._lines = lines
-        self._bounding_box = bbox
         self._text = ""
-
-        for line in lines:
+        
+        # construct the geometry and text for this paragraph
+        paragraph_bbox = {
+            # this is currently right instead of width, have to minus left value at the end
+            "Width": lines[0].geometry.bounding_box.left + lines[0].geometry.bounding_box.width,
+            "Height": (lines[-1].geometry.bounding_box.top + lines[-1].geometry.bounding_box.height) - lines[0].geometry.bounding_box.top,
+            "Left": lines[0].geometry.bounding_box.left,
+            "Top": lines[0].geometry.bounding_box.top
+        }
+        self._text += (lines[0].text + "\n")
+        for line in lines[1:]:
             self._text += (line.text + '\n')
+            # update bbox
+            paragraph_bbox["Left"] = min(
+                paragraph_bbox["Left"], line.geometry.bounding_box.left)
+            paragraph_bbox["Width"] = max(paragraph_bbox["Width"], line.geometry.bounding_box.left + line.geometry.bounding_box.width)
+        # minus left to get width value
+        paragraph_bbox["Width"] -= paragraph_bbox["Left"]
+
+        self._geometry = Geometry({
+            ResponseKeys.BOUNDING_BOX: paragraph_bbox,
+            ResponseKeys.POLYGON: []
+        })
 
     def __str__(self):
         s = "\n--------- Paragraph ---------\n\n" + \
@@ -333,168 +362,289 @@ class Paragraph:
         return self._lines
 
     @property
-    def bounding_box(self):
-        return self._bounding_box
+    def geometry(self):
+        return self._geometry
 
 
 class ParagraphConstructor:
     '''
     this is a pipeline class that creates Paragraph objects with list of Line objects
     '''
+    VERTICAL_DIST_MODE = "vertical"
+    HORIZONTAL_DIST_MODE = "horizontal"
+    HORIZONTAL_DIST_TOLERANCE = 0.01
+    VERTICAL_DIST_TOLERANCE = 0.01
 
     def __init__(self, lines):
         '''
+        Parameters:
+        =================
         lines: list of Line object
         '''
-        from numpy import percentile
-        self._percentile = percentile
-        columnIndex2Lines = self._line_readable(lines)
-        columnIndex2Bounds = self._vertical_dist_outliers(columnIndex2Lines)
-        self._create_paragraph(columnIndex2Lines, columnIndex2Bounds)
+        # merge lines that is close together by horizontal distance tolerance
+        # these lines should be a single line
+        new_lines = self._merge_line(lines)
 
-    def _line_readable(self, lines):
+        # get vertical distances between lines
+        vert_dist_list = self._get_vertical_dist(new_lines)
+
+        # construct paragraphs
+        self._create_paragraph(new_lines, vert_dist_list, upper_lim=self.VERTICAL_DIST_TOLERANCE)
+
+    def _check_vertically_overlap(self, line, column):
+        '''
+        check if line overlaps a column, if overlap, then that line belongs to that column
+
+        Parameters:
+        =================
+        line: line object
+
+        column: dict that contain "left" and "right" keys
+        '''
+        ll = line.geometry.bounding_box.left  # line left
+        lr = ll + line.geometry.bounding_box.width  # line right
+        cl, cr = column["left"], column["right"]
+        return (
+            ((lr >= cl) and (lr <= cr)) or
+            ((ll >= cl) and (ll <= cr)) or
+            ((ll <= cl) and (ll <= lr) and (lr >= cl) and (lr >= cr)) or
+            ((cl <= ll) and (cl <= lr) and (cr >= ll) and (cr >= lr))
+        )
+
+    def _get_line_readable(self, lines):
         '''
         this method parses list of lines into human readble order (column detection)
 
+        Parameters:
+        =================
         lines: list of Line object
-        '''
-        columns = []
-        # maps column index to all lines belong to that column
-        columnIndex2Lines = defaultdict(list)
 
+        Return:
+        =================
+        columnIndex2Lines: dict that maps column index to list of lines.
+                           Column index is sorted by position of column on document.
+                           (upper left the smallest)
+        '''
+        columns = [] # [column, [lines]]
         for line in lines:
-            column_found = False
-            for index, column in enumerate(columns):
-                # get bbox centre and column centre
-                bbox_left = line.geometry.bounding_box.left
-                bbox_right = line.geometry.bounding_box.left + line.geometry.bounding_box.width
-                bbox_centre = line.geometry.bounding_box.left + line.geometry.bounding_box.width/2
-                column_centre = column['left'] + column['right']/2
-                if (bbox_centre > column['left'] and bbox_centre < column['right']) or (column_centre > bbox_left and column_centre < bbox_right):
-                    # Bbox appears inside the column
-                    columnIndex2Lines[index].append(line)
-                    column_found = True
-                    break
-            if not column_found:
-                columns.append({'left': line.geometry.bounding_box.left,
-                                'right': line.geometry.bounding_box.left + line.geometry.bounding_box.width})
-                columnIndex2Lines[len(columns)-1].append(line)
+            ll = line.geometry.bounding_box.left  # line left
+            lr = ll + line.geometry.bounding_box.width  # line right
+            
+            column_overlap_count = 0
+            for item in columns:
+                if self._check_vertically_overlap(line, item[0]):
+                    column_overlap_count += 1
+            if column_overlap_count >= 2 or column_overlap_count == 0:
+                columns.append([
+                    {
+                        "left": ll,
+                        "right": lr
+                    },
+                    [line]
+                ])
+            else:
+                for index, item in enumerate(columns):
+                    if self._check_vertically_overlap(line, item[0]):
+                        columns[index][-1].append(line)
+                        break
+        columnIndex2Lines = defaultdict(list)
+        for index, item in enumerate(columns):
+            columnIndex2Lines[index] = item[-1]
 
         return columnIndex2Lines
 
-    def _get_vertical_dist(self, line_top, line_bottom):
+    def _check_items_same_line(self, item1, item2):
         '''
-        returns the ratio of vertical distance between 2 line object
+        check if 2 item belongs to same line in a document using location of bounding box
 
-        line_top: line object thats on the top location corresponding to line_bottom
+        Parameters:
+        =================
+        item: object that has geometry property
 
-        line_bottom: line object thats on the bottom location corresponding to line_top
+        Return:
+        =================
+        boolean: same line or not
         '''
-        bbox_top = line_top.geometry.bounding_box
-        bbox_bottom = line_bottom.geometry.bounding_box
+        bbox1 = item1.geometry.bounding_box
+        bbox2 = item2.geometry.bounding_box
 
-        bottom_of_bbox_top = bbox_top.top + bbox_top.height
-        top_of_bbox_bottom = bbox_bottom.top
+        bbox1_top = bbox1.top
+        bbox1_bottom = bbox1.top + bbox1.height
 
-        vertical_dif = top_of_bbox_bottom - bottom_of_bbox_top  # float
-        return vertical_dif
+        bbox2_top = bbox2.top
+        bbox2_bottom = bbox2.top + bbox2.height
 
-    def _vertical_dist_outliers(self, columnIndex2Lines):
+        if (
+            ((bbox1_bottom >= bbox2_top) and (bbox1_bottom <= bbox2_bottom)) or
+            ((bbox1_top <= bbox2_bottom) and (bbox1_top >= bbox2_top)) or
+            ((bbox1_top <= bbox2_top) and (bbox1_top <= bbox2_bottom) and (bbox1_bottom >= bbox2_top) and (bbox1_bottom >= bbox2_top)) or
+            ((bbox2_top <= bbox1_bottom) and (bbox2_top <= bbox1_top) and (
+                bbox2_bottom >= bbox1_bottom) and (bbox2_bottom >= bbox1_top))
+        ):
+            return True
+        return False
+
+    def _merge_geometry(self, geometry1, geometry2):
         '''
-        calculates vertical distance between 2 lines in a column. calculate the lower bound
-        and upper bound for outliers using IQR
+        merge 2 geometry vertically
 
-        columnIndex2Lines: dict that maps column index to all lines belong to that column
+        Parameters:
+        =================
+        geometry: geometry object
         '''
-        columnIndex2Bounds = {}  # maps column index to tuple (vert_dist_list, lower_lim, upper_lim)
+        new_bbox = {
+            "Left": min(geometry1.bounding_box.left, geometry2.bounding_box.left),
+            "Top": min(geometry1.bounding_box.top, geometry2.bounding_box.top),
+            "Height": max(geometry1.bounding_box.top + geometry1.bounding_box.height, geometry2.bounding_box.top + geometry2.bounding_box.height) - min(geometry1.bounding_box.top, geometry2.bounding_box.top),
+            "Width": max(geometry1.bounding_box.left + geometry1.bounding_box.width, geometry2.bounding_box.left + geometry2.bounding_box.width) - min(geometry1.bounding_box.left, geometry2.bounding_box.left)
+        }
+        return Geometry({
+            ResponseKeys.BOUNDING_BOX: new_bbox,
+            ResponseKeys.POLYGON: []
+        })
 
-        column_indexes = sorted(list(columnIndex2Lines.keys()))
-        for column_index in column_indexes:
-            lines = columnIndex2Lines[column_index]
-            prev_line = None
-            vert_dist_list = []  # index x contains vertical dist of line x and line x+1
-            for line in lines:
-                if prev_line:
-                    vert_dif = self._get_vertical_dist(prev_line, line)
-                    prev_line = line
-                    vert_dist_list.append(vert_dif)
+    def _merge_line(self, lines):
+        '''
+        merge all line that belongs to same line location
+
+        Parameters:
+        =================
+        lines: list of line object
+
+        Return:
+        =================
+        new_lines: list of lines that are merged
+        '''
+        if not len(lines):
+            return []
+        else:
+            new_lines = []
+            prev_line = lines[0]
+            for line in lines[1:]:
+                if self._check_items_same_line(prev_line, line):
+                    horizontal_dist = self._get_dist(prev_line, line, mode=self.HORIZONTAL_DIST_MODE)
+                    if horizontal_dist <= self.HORIZONTAL_DIST_TOLERANCE:
+                        # merge 2 lines
+                        merged_text = prev_line.text + " " + line.text
+                        merged_geometry = self._merge_geometry(
+                            prev_line.geometry, line.geometry)
+                        prev_line.text = merged_text
+                        prev_line.geometry = merged_geometry
+                        prev_line.words = prev_line.words + line.words
                 else:
+                    new_lines.append(prev_line)
                     prev_line = line
 
-            # calculating IQR and outlier bounds
-            Q1, Q3 = self._percentile(vert_dist_list, [25, 75])
-            IQR = Q3 - Q1
-            lower_lim = Q1 - 1.5 * IQR
-            upper_lim = Q3 + 1.5 * IQR
+            # add the last line
+            new_lines.append(prev_line)
+            return new_lines
 
-            columnIndex2Bounds[column_index] = (
-                vert_dist_list, lower_lim, upper_lim)
+    def _get_dist(self, item1, item2, mode):
+        '''
+        compute vertical or horizontal distance between 2 items
 
-        return columnIndex2Bounds
+        Parameters:
+        =================
+        item: 2 items that has geometry property to compute distance 
 
-    def _create_paragraph(self, columnIndex2Lines, columnIndex2Bounds):
+        mode: vertical distance or horizontal distance
+
+        Parameters:
+        =================
+        float: distance between 2 items, range [0, 1]
+        '''
+        if mode == self.VERTICAL_DIST_MODE:
+            bbox_top = item1.geometry.bounding_box
+            bbox_bottom = item2.geometry.bounding_box
+
+            bottom_of_bbox_top = bbox_top.top + bbox_top.height
+            top_of_bbox_bottom = bbox_bottom.top
+
+            vertical_dist = top_of_bbox_bottom - bottom_of_bbox_top  # float
+            return vertical_dist
+        elif mode == self.HORIZONTAL_DIST_MODE:
+            bbox_left = item1.geometry.bounding_box
+            bbox_right = item2.geometry.bounding_box
+
+            right_of_bbox_left = bbox_left.left + bbox_left.width
+            left_of_bbox_right = bbox_right.left
+
+            horizontal_dist = left_of_bbox_right - right_of_bbox_left  # float
+            return horizontal_dist
+
+    def _get_vertical_dist(self, lines):
+        '''
+        calculates vertical distance between 2 lines in a column.
+
+        Parameters:
+        =================
+        lines: list of line object
+
+        Return:
+        =================
+        vert_dist_list: list of vertical distance between 2 line object.
+                        this list has length of len(lines)-1
+        '''
+        vert_dist_list = []
+
+        prev_line = lines[0]
+        for line in lines[1:]:
+            if self._check_items_same_line(prev_line, line):
+                continue
+            vert_dist = self._get_dist(
+                prev_line, line, mode=self.VERTICAL_DIST_MODE)
+            prev_line = line
+            vert_dist_list.append(vert_dist)
+
+        return vert_dist_list
+
+    def _create_paragraph(self, lines, vert_dist_list, upper_lim):
+        '''
+        create paragraph object from lines
+
+        Parameters:
+        =================
+        lines: list of line objects
+        
+        vert_dist_list: list of vertical distance between 2 line object.
+                        this list has length of len(lines)-1
+        
+        upper_lim: vertical distance tolerance. If 2 line object has vertical
+                   distance >= upper_lim, then we chunck the lines into 2 paragraphs.
+        '''
         self.paragraphs = []
+        cur_paragraph_lines = []
+        vert_dist_index_fixer = 0
+        prev_line = None
+        for line_index in range(len(lines)):
+            cur_line = lines[line_index]
+            vert_dist_index = line_index-1-vert_dist_index_fixer
+            if vert_dist_index >= 0:
+                if self._check_items_same_line(prev_line, cur_line):
+                    cur_paragraph_lines.append(cur_line)
+                    vert_dist_index_fixer += 1
+                    continue
+                vert_dist = vert_dist_list[vert_dist_index]
+                # check if outlier detected, truncate the lines into paragraph
+                if vert_dist >= upper_lim:
+                    # detect columns
+                    columnIndex2Lines = self._get_line_readable(
+                        cur_paragraph_lines)
+                    column_indexes = sorted(list(columnIndex2Lines.keys()))
+                    for column_index in column_indexes:
+                        self.paragraphs.append(
+                            Paragraph(columnIndex2Lines[column_index]))
+                    cur_paragraph_lines = []
+                
+            prev_line = cur_line
+            cur_paragraph_lines.append(cur_line)
+        
+        # finish creating last paragraph
+        columnIndex2Lines = self._get_line_readable(cur_paragraph_lines)
         column_indexes = sorted(list(columnIndex2Lines.keys()))
         for column_index in column_indexes:
-            lines = columnIndex2Lines[column_index]
-            vert_dist_list, lower_lim, upper_lim = columnIndex2Bounds[column_index]
-
-            cur_paragraph_lines = []
-            paragraph_bbox = {
-                "Left": 1.0,
-                "Top": 0.0,
-                "Width": 0.0,
-                "Height": 0.0
-            }
-
-            for block_index in range(len(lines)):
-                cur_line = lines[block_index]
-                vert_dist_index = block_index - 1
-                if vert_dist_index >= 0:
-                    vert_dist = vert_dist_list[vert_dist_index]
-                    # check if outlier detected, truncate the lines into paragraph
-                    if (vert_dist > upper_lim) or (vert_dist < lower_lim):
-                        # last line of the detected paragraph
-                        last_line = cur_paragraph_lines[-1]
-                        # first line of the detected paragraph
-                        first_line = cur_paragraph_lines[0]
-                        paragraph_bbox["Height"] = (
-                            last_line.geometry.bounding_box.top + last_line.geometry.bounding_box.height) - first_line.geometry.bounding_box.top
-                        self.paragraphs.append(Paragraph(cur_paragraph_lines, BoundingBox(
-                            paragraph_bbox["Width"], paragraph_bbox["Height"], paragraph_bbox["Left"], paragraph_bbox["Top"])))
-
-                        # reset variables
-                        paragraph_bbox = {
-                            "Left": 1.0,
-                            "Top": cur_line.geometry.bounding_box.top,
-                            "Width": 0.0,
-                            "Height": 0.0
-                        }
-                        cur_paragraph_lines = []
-                    else:
-                        # update bbox
-                        paragraph_bbox["Left"] = min(
-                            paragraph_bbox["Left"], cur_line.geometry.bounding_box.left)
-                        paragraph_bbox["Width"] = max(
-                            paragraph_bbox["Width"], cur_line.geometry.bounding_box.width)
-                else:
-                    paragraph_bbox["Top"] = cur_line.geometry.bounding_box.top
-                    paragraph_bbox["Left"] = min(
-                        paragraph_bbox["Left"], cur_line.geometry.bounding_box.left)
-                    paragraph_bbox["Width"] = max(
-                        paragraph_bbox["Width"], cur_line.geometry.bounding_box.width)
-
-                cur_paragraph_lines.append(cur_line)
-
-            # finish creating last paragraph in this column
-            last_line = cur_paragraph_lines[-1]
-            first_line = cur_paragraph_lines[0]
-            paragraph_bbox["Height"] = (last_line.geometry.bounding_box.top +
-                                        last_line.geometry.bounding_box.height) - first_line.geometry.bounding_box.top
-            self.paragraphs.append(Paragraph(cur_paragraph_lines, BoundingBox(
-                paragraph_bbox["Width"], paragraph_bbox["Height"], paragraph_bbox["Left"], paragraph_bbox["Top"])))
-
-
+            self.paragraphs.append(Paragraph(columnIndex2Lines[column_index]))
+        
 
 
 '''
@@ -677,7 +827,7 @@ class FieldValue:
             elif child_block[ResponseKeys.BLOCK_TYPE] == BlockType.SELECTION_ELEMENT:
                 selection_element = SelectionElement(child_block)
                 self._content.append(selection_element)
-                self._text = selection_element.selection_status
+                text_list.append(selection_element.selection_status)
         self._text = " ".join(text_list) if len(text_list) else ""
 
     def __str__(self):
@@ -1099,10 +1249,15 @@ class Page:
         if len(self.form.key_value_sets):
             self.add_content(self.form)
 
-        # parse lines to paragraphs
-        self._paragraphs = ParagraphConstructor(self.lines).paragraphs
-        # concat paragraphs and other contents
-        self._content = self._paragraphs + self._content
+        self._paragraphs = []
+        if len(self.lines):
+            # parse lines to paragraphs
+            self._paragraphs = ParagraphConstructor(self.lines).paragraphs
+            # concat paragraphs and other contents
+            self._content = self._paragraphs + self._content
+        
+        for paragraph in self._paragraphs:
+            self._text += (paragraph.text + "\n")
 
     @property
     def blocks(self):
