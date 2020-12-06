@@ -359,13 +359,25 @@ class Paragraph:
     def text(self):
         return self._text
 
+    @text.setter
+    def text(self, value):
+        self._text = value
+
     @property
     def lines(self):
         return self._lines
 
+    @lines.setter
+    def lines(self, value):
+        self._lines = value
+
     @property
     def geometry(self):
         return self._geometry
+
+    @geometry.setter
+    def geometry(self, value):
+        self._geometry = value
 
 
 class ParagraphConstructor:
@@ -383,16 +395,27 @@ class ParagraphConstructor:
         =================
         lines: list of Line object
         '''
+        # list of paragraph objects
+        self.paragraphs = []
+
         # merge lines that is close together by horizontal distance tolerance
-        # these lines should be a single line
         new_lines = self._merge_line(lines)
+        
+        # chunck lines up by vertical distance, create paragraphs
+        paragraph_list = self._create_paragraph(new_lines)
+        
+        # chunk each paragraph up by column so its in readable format
+        new_paragraphs = []
+        for paragraph in paragraph_list:
+            columnIndex2Lines = self._get_line_readable(paragraph.lines)
+            column_indexes = sorted(list(columnIndex2Lines.keys()))
+            for index in column_indexes:
+                new_paragraphs.append(Paragraph(columnIndex2Lines[index]))
+        
+        self.paragraphs = new_paragraphs
 
-        # get vertical distances between lines
-        vert_dist_list = self._get_vertical_dist(new_lines)
-
-        # construct paragraphs
-        self._create_paragraph(new_lines, vert_dist_list,
-                               upper_lim=self.VERTICAL_DIST_TOLERANCE)
+        # merge paragraphs vertically
+        self.paragraphs = self._merge_paragraphs()
 
     def _check_vertically_overlap(self, line, column):
         '''
@@ -489,7 +512,7 @@ class ParagraphConstructor:
 
     def _merge_geometry(self, geometry1, geometry2):
         '''
-        merge 2 geometry vertically
+        merge 2 geometry vertically or horizontally
 
         Parameters:
         =================
@@ -531,7 +554,8 @@ class ParagraphConstructor:
                         # merge 2 lines
                         merged_text = prev_line.text + " " + line.text
                         merged_geometry = self._merge_geometry(
-                            prev_line.geometry, line.geometry)
+                            prev_line.geometry, line.geometry
+                        )
 
                         prev_line.text = merged_text
                         prev_line.geometry = merged_geometry
@@ -546,6 +570,46 @@ class ParagraphConstructor:
             # add the last line
             new_lines.append(prev_line)
             return new_lines
+
+    def _merge_paragraphs(self):
+        '''
+        merge paragraphs vertically
+        '''
+        if not len(self.paragraphs):
+            return []
+        else:
+            new_paragraphs = []
+            prev_paragraph = self.paragraphs[0]
+            for paragraph in self.paragraphs[1:]:
+                vertical_dist = self._get_dist(
+                    prev_paragraph, paragraph, mode=self.VERTICAL_DIST_MODE)
+
+                merge_flag = False
+                if self._check_vertically_overlap(paragraph, {
+                    "left": prev_paragraph.geometry.bounding_box.left,
+                    "right": prev_paragraph.geometry.bounding_box.left + prev_paragraph.geometry.bounding_box.width
+                }):
+                    if vertical_dist < self.VERTICAL_DIST_TOLERANCE:
+                        merge_flag = True
+
+                if merge_flag:
+                    # merge 2 paragraphs
+                    merged_text = prev_paragraph.text + " " + paragraph.text
+                    merged_geometry = self._merge_geometry(
+                        prev_paragraph.geometry, paragraph.geometry
+                    )
+                    merged_lines = prev_paragraph.lines + paragraph.lines
+
+                    prev_paragraph.text = merged_text
+                    prev_paragraph.geometry = merged_geometry
+                    prev_paragraph.lines = merged_lines
+                else:
+                    new_paragraphs.append(prev_paragraph)
+                    prev_paragraph = paragraph
+
+            # add the last line
+            new_paragraphs.append(prev_paragraph)
+            return new_paragraphs
 
     def _get_dist(self, item1, item2, mode):
         '''
@@ -580,33 +644,33 @@ class ParagraphConstructor:
             horizontal_dist = left_of_bbox_right - right_of_bbox_left  # float
             return horizontal_dist
 
-    def _get_vertical_dist(self, lines):
+    def _get_vertical_dist(self, items):
         '''
-        calculates vertical distance between 2 lines in a column.
+        calculates vertical distance between 2 items
 
         Parameters:
         =================
-        lines: list of line object
+        items: list of item with geometry property
 
         Return:
         =================
-        vert_dist_list: list of vertical distance between 2 line object.
+        vert_dist_list: list of vertical distance between 2 item object.
                         this list has length of len(lines)-1
         '''
         vert_dist_list = []
 
-        prev_line = lines[0]
-        for line in lines[1:]:
-            if self._check_items_same_line(prev_line, line):
+        prev_item = items[0]
+        for item in items[1:]:
+            if self._check_items_same_line(prev_item, item):
                 continue
             vert_dist = self._get_dist(
-                prev_line, line, mode=self.VERTICAL_DIST_MODE)
-            prev_line = line
+                prev_item, item, mode=self.VERTICAL_DIST_MODE)
+            prev_item = item
             vert_dist_list.append(vert_dist)
 
         return vert_dist_list
 
-    def _create_paragraph(self, lines, vert_dist_list, upper_lim):
+    def _create_paragraph(self, lines):
         '''
         create paragraph object from lines
 
@@ -614,14 +678,13 @@ class ParagraphConstructor:
         =================
         lines: list of line objects
 
-        vert_dist_list: list of vertical distance between 2 line object.
-                        this list has length of len(lines)-1
-
-        upper_lim: vertical distance tolerance. If 2 line object has vertical
-                   distance >= upper_lim, then we chunck the lines into 2 paragraphs.
+        Return:
+        =================
+        paragraphs: list of paragraph object
         '''
-        self.paragraphs = []
+        paragraph_list = []
         cur_paragraph_lines = []
+        vert_dist_list = self._get_vertical_dist(lines)
         vert_dist_index_fixer = 0
         prev_line = None
         for line_index in range(len(lines)):
@@ -634,32 +697,19 @@ class ParagraphConstructor:
                     continue
                 vert_dist = vert_dist_list[vert_dist_index]
                 # check if outlier detected, truncate the lines into paragraph
-                if vert_dist >= upper_lim:
-                    # detect columns
-                    columnIndex2Lines = self._get_line_readable(
-                        cur_paragraph_lines)
-                    column_indexes = sorted(list(columnIndex2Lines.keys()))
-                    for column_index in column_indexes:
-                        self.paragraphs.append(
-                            Paragraph(columnIndex2Lines[column_index]))
+                if vert_dist >= self.VERTICAL_DIST_TOLERANCE:
+                    paragraph_list.append(Paragraph(cur_paragraph_lines))
                     cur_paragraph_lines = []
-
+            
             prev_line = cur_line
             cur_paragraph_lines.append(cur_line)
-
-        # finish creating last paragraph
-        columnIndex2Lines = self._get_line_readable(cur_paragraph_lines)
-        column_indexes = sorted(list(columnIndex2Lines.keys()))
-        for column_index in column_indexes:
-            self.paragraphs.append(Paragraph(columnIndex2Lines[column_index]))
         
-        '''
-        prev_p = self.paragraphs[0]
-        for paragraph in self.paragraphs[1:]:
-            print("Dist", self._get_dist(prev_p, paragraph, self.VERTICAL_DIST_MODE))
-            print(prev_p.text)
-            prev_p = paragraph
-        '''
+        # finish createing last paragraph
+        paragraph_list.append(Paragraph(cur_paragraph_lines))
+        return paragraph_list
+
+
+
 '''
 ========================================
 =                 FORM                 =
@@ -1359,7 +1409,7 @@ class Document:
         total_pages: total number of pages in this document
         pageNum2Block: dict that maps page number to all blocks in that page
         block_map: dict that maps block_id to block object
-        doc_pages: list that contains Page objects
+        doc_pages: list that contains Page objects (start from page num 0)
     }
     '''
 
