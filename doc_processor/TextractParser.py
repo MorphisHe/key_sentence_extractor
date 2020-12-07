@@ -1305,6 +1305,23 @@ class Page:
                             # self._text += (line.text + '\n')
             elif block_type == BlockType.TABLE:
                 table = Table(block, block_map)
+                
+                total_char = 0
+                not_char_count = 0
+                for row in table.rows:
+                    for cell in row.cells:
+                        for word in cell.text.split():
+                            for char in word:
+                                if not char.isalpha():
+                                    not_char_count += 1
+                                total_char += 1
+                print(table)
+                print(f"Total char {total_char}")
+                print(f"Not char {not_char_count}")
+                ratio = not_char_count/total_char * 100
+                print(f"Ratio {ratio}")
+                print("#"*20, "\n")
+
                 self.add_table(table)
                 self.add_content(table)
             elif block_type == BlockType.KEY_VALUE_SET:
@@ -1418,7 +1435,7 @@ class Document:
     SINGLE_CHAR_WORD_THRESHOLD = 0.5  # single char percentage
     NUM_WORD_THRESHOLD = 15  # min number of words in paragraph
 
-    def __init__(self, json_response_list, doc_name=None, parse_para=False):
+    def __init__(self, json_response_list, doc_name=None, parse_para=None):
         '''
         Parameters:
         =================
@@ -1426,7 +1443,7 @@ class Document:
 
         doc_name: name of current document
 
-        parse_para: default False, set to True if want to parse paragraph. refer to parse_paragraph() function for detail
+        parse_para: default None, replace with dict to parser. refer to parse_paragraph() function for detail
         '''
         self._doc_name = doc_name
 
@@ -1443,7 +1460,9 @@ class Document:
         self._parse()
 
         # parse paragraphs
-        if parse_para:
+        if isinstance(parse_para, dict):
+            self.parse_paragraphs(parse_para)
+        elif parse_para:
             self.parse_paragraphs()
 
     def _organize_by_page(self, json_response_list):
@@ -1502,7 +1521,7 @@ class Document:
         s += "==================== [End of Document] =====================\n"
         return s
 
-    def check_discard_chunk(self, item, mode, num_word_threshold, non_char_threshold, single_char_threshold):
+    def check_discard_chunk(self, item, mode={"non_char":None, "single_char":None, "min_word_count":None}):
         '''
         check if a item should be discarded base on portion of non
         alphabet chars in the text. portion of single char words.
@@ -1511,12 +1530,16 @@ class Document:
         =================
         item: object that has text property
 
-        mode:
+        mode: modes of detection as dict
+              key: mode to perform
+              value: (default None), parameter of the mode
 
             - "non_char": discard paragraph by percentage of non char characters
             - "single_char": discard paragraph by percentage of single char words
             - "min_word_count": discard paragraph if word_count < min_word_count
 
+        Class Attribute Used:
+        =================
         num_word_threshold: default 15, used to determind whether a paragraph should be discarded if len(words) < threshold
 
         non_char_threshold: default 0.5, used to determind whether a paragraph
@@ -1530,9 +1553,13 @@ class Document:
         =================
         boolean: True if this item is to be discarded, False otherwise.
         '''
-        char_threshold = self.NON_CHAR_THRESHOLD if not non_char_threshold else non_char_threshold
-        single_threshold = self.NON_CHAR_THRESHOLD if not single_char_threshold else single_char_threshold
-        word_count_threshold = self.NUM_WORD_THRESHOLD if not num_word_threshold else num_word_threshold
+        char_threshold, single_threshold, word_count_threshold = None, None, None
+        if "non_char" in mode.keys():
+            char_threshold = self.NON_CHAR_THRESHOLD if not mode["non_char"] else mode["non_char"]
+        if "single_char" in mode.keys():
+            single_threshold = self.NON_CHAR_THRESHOLD if not mode["single_char"] else mode["single_char"]
+        if "min_word_count" in mode.keys():
+            word_count_threshold = self.NUM_WORD_THRESHOLD if not mode["min_word_count"] else mode["min_word_count"]
 
         single_char_word = 0
         total_word = 0
@@ -1560,7 +1587,7 @@ class Document:
         total_char = total_char if total_char else 1
         return ((not_char_count/total_char > char_threshold) or (single_char_word/total_word > single_threshold))
 
-    def parse_paragraphs(self, mode=["non_char", "single_char", "min_word_count"], num_word_threshold=None, non_char_threshold=None, single_char_threshold=None):
+    def parse_paragraphs(self, mode={"non_char":None, "single_char":None, "min_word_count":None}):
         '''
         parse paragraphs by modes:
 
@@ -1570,22 +1597,15 @@ class Document:
 
         Parameters:
         =================
-        mode: modes of detection
-
-        num_word_threshold: default 15, used to determind whether a paragraph should be discarded if len(words) < threshold
-
-        non_char_threshold: default 0.5, used to determind whether a paragraph
-                            should be discarded base on percentage of not alphabet chars.
-
-        single_char_threshold: default 0.5, used to determind whether a paragraph
-                               should be discarded based on percentage of single
-                               char words.
+        mode: modes of detection as dict
+              key: mode to perform
+              value: (default None), parameter of the mode
         '''
         for page_obj in self.doc_pages:
             new_paragraphs = []
             for paragraph in page_obj.paragraphs:
                 # non char filter
-                if self.check_discard_chunk(paragraph, mode, num_word_threshold, non_char_threshold, single_char_threshold):
+                if self.check_discard_chunk(paragraph, mode):
                     continue
                 new_paragraphs.append(paragraph)
 
