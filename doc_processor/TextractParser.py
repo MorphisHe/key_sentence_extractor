@@ -1309,32 +1309,11 @@ class Page:
                             if not all(child_id in non_line_childs for child_id in child_ids):
                                 line = Line(block, block_map)
                                 self.add_line(line)
-                                # self.add_content(line)
-                                # self._text += (line.text + '\n')
                 elif process_type == ProcessType.DETECTION:
                     line = Line(block, block_map)
                     self.add_line(line)
             elif block_type == BlockType.TABLE:
                 table = Table(block, block_map)
-                
-                '''
-                total_char = 0
-                not_char_count = 0
-                for row in table.rows:
-                    for cell in row.cells:
-                        for word in cell.text.split():
-                            for char in word:
-                                if not char.isalpha():
-                                    not_char_count += 1
-                                total_char += 1
-                print(table)
-                print(f"Total char {total_char}")
-                print(f"Not char {not_char_count}")
-                ratio = not_char_count/total_char * 100
-                print(f"Ratio {ratio}")
-                print("#"*20, "\n")
-                '''
-
                 self.add_table(table)
                 self.add_content(table)
             elif block_type == BlockType.KEY_VALUE_SET:
