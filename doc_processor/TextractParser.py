@@ -415,10 +415,8 @@ class ParagraphConstructor:
                 paragraph_list = self._create_paragraph(columnIndex2Lines[index])
                 new_paragraphs += paragraph_list
         
-        self.paragraphs = new_paragraphs
-
         # merge paragraphs vertically
-        self.paragraphs = self._merge_paragraphs()
+        self.paragraphs = self._merge_paragraphs(new_paragraphs)
 
     def _check_vertically_overlap(self, line, column):
         '''
@@ -574,16 +572,24 @@ class ParagraphConstructor:
             new_lines.append(prev_line)
             return new_lines
 
-    def _merge_paragraphs(self):
+    def _merge_paragraphs(self, paragraph_list):
         '''
         merge paragraphs vertically
+
+        Parameters:
+        =================
+        paragraph_list: list of paragraph object
+
+        Return:
+        =================
+        new_paragraphs: list of paragraph object that is merged
         '''
-        if not len(self.paragraphs):
+        if not len(paragraph_list):
             return []
         else:
             new_paragraphs = []
-            prev_paragraph = self.paragraphs[0]
-            for paragraph in self.paragraphs[1:]:
+            prev_paragraph = paragraph_list[0]
+            for paragraph in paragraph_list[1:]:
                 vertical_dist = self._get_dist(
                     prev_paragraph, paragraph, mode=self.VERTICAL_DIST_MODE)
 
