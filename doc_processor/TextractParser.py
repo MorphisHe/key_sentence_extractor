@@ -1,4 +1,5 @@
 from collections import defaultdict
+from doc_processor.DocumentProcessor import ProcessType
 
 
 class BlockType:
@@ -1249,7 +1250,7 @@ class Page:
     }
     '''
 
-    def __init__(self, page_num, blocks, block_map, non_line_childs):
+    def __init__(self, page_num, blocks, block_map, non_line_childs, process_type):
         '''
         page_num: the page number of this Page object 
 
@@ -1258,6 +1259,8 @@ class Page:
         block_map: dict that maps block_id to block object
 
         non_line_childs: list of child_ids that belongs to TABLE or FORM
+
+        process_type: ["Detection" | "Analysis"] the mode for textract response
         '''
         self._blocks = blocks
         self._text = ""
@@ -1267,7 +1270,7 @@ class Page:
         self._content = []
         self._page_num = page_num
 
-        self._parse(block_map, non_line_childs)
+        self._parse(block_map, non_line_childs, process_type)
 
     def __str__(self):
         s = "\n***************** [Page Number: " + \
@@ -1278,7 +1281,7 @@ class Page:
             str(self.page_num) + "] ********************\n"
         return s
 
-    def _parse(self, block_map, non_line_childs):
+    def _parse(self, block_map, non_line_childs, process_type):
         '''
         parse blocks list into defined objects
 
@@ -1287,6 +1290,8 @@ class Page:
         non_line_childs: list of child ids that belongs to table or form
 
         block_map: dict that maps block id to block object
+
+        process_type: ["Detection" | "Analysis"] the mode for textract response
         '''
         for block in self.blocks:
             block_type = block[ResponseKeys.BLOCK_TYPE]
@@ -1294,18 +1299,23 @@ class Page:
                 self._geometry = Geometry(block[ResponseKeys.GEOMETRY])
                 self._id = block[ResponseKeys.ID]
             elif block_type == BlockType.LINE:
-                # if words belongs to table or form, then dont add to line object
-                if ResponseKeys.RELATIONSHIPS in block:
-                    for relationship in block[ResponseKeys.RELATIONSHIPS]:
-                        child_ids = relationship[ResponseKeys.IDs]
-                        if not all(child_id in non_line_childs for child_id in child_ids):
-                            line = Line(block, block_map)
-                            self.add_line(line)
-                            # self.add_content(line)
-                            # self._text += (line.text + '\n')
+                if process_type == ProcessType.ANALYSIS:
+                    # if words belongs to table or form, then dont add to line object
+                    if ResponseKeys.RELATIONSHIPS in block:
+                        for relationship in block[ResponseKeys.RELATIONSHIPS]:
+                            child_ids = relationship[ResponseKeys.IDs]
+                            if not all(child_id in non_line_childs for child_id in child_ids):
+                                line = Line(block, block_map)
+                                self.add_line(line)
+                                # self.add_content(line)
+                                # self._text += (line.text + '\n')
+                elif process_type == ProcessType.DETECTION:
+                    line = Line(block, block_map)
+                    self.add_line(line)
             elif block_type == BlockType.TABLE:
                 table = Table(block, block_map)
                 
+                '''
                 total_char = 0
                 not_char_count = 0
                 for row in table.rows:
@@ -1321,6 +1331,7 @@ class Page:
                 ratio = not_char_count/total_char * 100
                 print(f"Ratio {ratio}")
                 print("#"*20, "\n")
+                '''
 
                 self.add_table(table)
                 self.add_content(table)
@@ -1435,7 +1446,7 @@ class Document:
     SINGLE_CHAR_WORD_THRESHOLD = 0.5  # single char percentage
     NUM_WORD_THRESHOLD = 15  # min number of words in paragraph
 
-    def __init__(self, json_response_list, doc_name=None, parse_para=None):
+    def __init__(self, json_response_list, process_type="DETECTION", doc_name=None, parse_para=None):
         '''
         Parameters:
         =================
@@ -1444,7 +1455,15 @@ class Document:
         doc_name: name of current document
 
         parse_para: default None, replace with dict to parser. refer to parse_paragraph() function for detail
+
+        process_type: ["Detection" | "Analysis"] the mode for textract response
         '''
+        if process_type in [ProcessType.DETECTION, ProcessType.ANALYSIS]:
+            self.process_type = process_type
+        else:
+            raise Exception(
+                f"Invalid Process Type: {process_type}\nUse only: {ProcessType.DETECTION}, {ProcessType.ANALYSIS}")
+
         self._doc_name = doc_name
 
         if not isinstance(json_response_list, list):
@@ -1511,7 +1530,7 @@ class Document:
         self._doc_pages = []  # list of Page object
         for page_num in page_nums:
             self.add_page(Page(page_num, self.get_blocks_by_page_num(
-                page_num), self.block_map, self.non_line_childs))
+                page_num), self.block_map, self.non_line_childs, self.process_type))
 
     def __str__(self):
         doc_header = f"Document: {self.doc_name}" if self.doc_name else "Document"
