@@ -1542,7 +1542,7 @@ class Document:
         s += "==================== [End of Document] =====================\n"
         return s
 
-    def check_discard_chunk(self, item, mode={"non_char":None, "single_char":None, "min_word_count":None}):
+    def _check_discard_chunk(self, item, mode={"non_char":None, "single_char":None, "min_word_count":None}):
         '''
         check if a item should be discarded base on portion of non
         alphabet chars in the text. portion of single char words.
@@ -1626,7 +1626,7 @@ class Document:
             new_paragraphs = []
             for paragraph in page_obj.paragraphs:
                 # non char filter
-                if self.check_discard_chunk(paragraph, mode):
+                if self._check_discard_chunk(paragraph, mode):
                     continue
                 new_paragraphs.append(paragraph)
 
