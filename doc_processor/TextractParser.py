@@ -411,7 +411,9 @@ class ParagraphConstructor:
             columnIndex2Lines = self._get_line_readable(paragraph.lines)
             column_indexes = sorted(list(columnIndex2Lines.keys()))
             for index in column_indexes:
-                new_paragraphs.append(Paragraph(columnIndex2Lines[index]))
+                # chunck lines up by vertical distance, create paragraphs
+                paragraph_list = self._create_paragraph(columnIndex2Lines[index])
+                new_paragraphs += paragraph_list
         
         self.paragraphs = new_paragraphs
 
