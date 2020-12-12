@@ -151,11 +151,11 @@ class SingleDocumentProcessor:
                 cur_page_nums_slice = page_nums[cur_right_index : cur_right_index+max_sim_calls]
                 cur_right_index += max_sim_calls
 
-            self.__clear_memory()
+            self._clear_memory()
             results = [pageNum2Result[page_num] for page_num in sorted(list(pageNum2Result.keys()))]
             return results
 
-    def __clear_memory(self):
+    def _clear_memory(self):
         '''
         free the memory of current object
         '''
