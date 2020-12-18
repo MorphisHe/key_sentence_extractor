@@ -79,7 +79,7 @@ class EmbedRank:
         ---------------
         pdf_path: path of pdf to extract text from
         
-        Parameter:
+        Return:
         ---------------
         Extracted raw text
         '''
@@ -117,7 +117,7 @@ class EmbedRank:
                      ex: (2ab 42. 239). sdsd 2
                      things in () is consider a valid continous graph information
         
-        Parameter:
+        Return:
         ---------------
         new_sent_token: clean list of sent token without graph information. [sent1, sent2, ..]
         0123456789
@@ -193,7 +193,7 @@ class EmbedRank:
                      ex: (2ab 42. 239). sdsd 2
                      things in () is consider a valid continous graph information
         
-        Parameter:
+        Return:
         ---------------
         new_sent_token: clean list of sent token without graph information. [sent1, sent2, ...]
         '''
