@@ -56,9 +56,12 @@ def reconstructor(sent_token, selected_ckp_strings, selected_sent_index):
         res_dict["og_sents"].append((sent_index, sent_token[sent_index]))
 
     rank = 1
+    seen_sent_index = set()
     for sent_index in selected_sent_index:
-        res_dict["selected_full_sents"].append((rank, sent_token[sent_index], sent_index))
-        rank += 1
+        if sent_index not in seen_sent_index:
+            seen_sent_index.add(sent_index)
+            res_dict["selected_full_sents"].append((rank, sent_token[sent_index], sent_index))
+            rank += 1
 
     res_dict["zip_display"] = list(zip(res_dict["selected_ckp_strings"], res_dict["selected_full_sents"]))
 
