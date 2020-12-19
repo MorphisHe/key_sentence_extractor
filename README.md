@@ -12,8 +12,10 @@ This project implements EmbedRank algorithm to extract key phrases from document
     - python3 server.py
     - select or drop a pdf
 ![](readme_images/drag_drop.png)
+
     - wait for server response
     - click sort to toggle between rank and original sentence
+![](readme_images/content_page.png)]
 
 # TODO
     - change bottom left container to something else
