@@ -8,3 +8,13 @@ test.py
 .DS_Store
 results/
 node_modules/
+
+doc_processor_test.py
+textract_parser_test.py
+textract_results/
+tryy.py
+TextractParser2.py
+textract_bbox_test.py
+pdfs/
+*.bin
+*.npy

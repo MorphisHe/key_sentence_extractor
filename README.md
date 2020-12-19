@@ -1,23 +1,20 @@
 # Key Sentence Extractor
-- EmbedRank
-    - text extraction
-    - POS tagging
-    - doc2vec embedding
-    - mmr
-- frontend
-    - flask templet
-    - jinja engine
-- backend
-    - flask
+    - upload pdf
+    - extract key phrases
+    - display sentences with the ranked key phrases
 
-# digit > 100, delete sentence
-# digit > 20, check for validation
-	- check if there is more than 10 digits continuously
-	- digit that came in window of 4 char is consider as continuously
-	- if not we dont count
-	- if yes we delete that line from sentence and divide the sent
+This project implements EmbedRank algorithm to extract key phrases from documents using Doc2Vec model.
 
-# TODO: try to remove the % after digit line
-	- thoughts
-		- if end_index = 10, check chars after end_index that is not alphabet, then move end_index to the
-		  index of firs talphabet+1
+# Setup
+    - install all packages in requirement.txt
+
+# Usage
+    - python3 server.py
+    - select or drop a pdf
+    - wait for server response
+    - click sort to toggle between rank and original sentence
+
+# TODO
+    - change bottom left container to something else
+    - fix bug that pdf shower dont refresh, probably because of caches
+    - not using doc_processor module due to cost of aws textract
