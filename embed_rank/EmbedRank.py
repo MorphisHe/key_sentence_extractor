@@ -1,4 +1,3 @@
-from string import punctuation
 from tika import parser
 import nltk
 import unidecode
@@ -425,7 +424,7 @@ class EmbedRank:
         return doc_embed, ckps_embed
 
     
-    def mmr(self, doc_embed, ckps_embed, beta=0.55, top_n=10):
+    def mmr(self, doc_embed, ckps_embed, beta=0.55, top_n=-1):
         '''
         This method applied mmr to pick the top_n ckp with controlled similarity between ckps
 
@@ -434,6 +433,10 @@ class EmbedRank:
         doc_embed: a tup (doc_tag, doc_embed)
 
         ckps_embed: a dict with key=ckp string and value= [embeded ckp vector, sent_index]
+
+        beta: smaller beta means less penalty to similar key phrase
+
+        top_n: default = -1, return all ranks
         
         Return:
         ---------------
@@ -472,6 +475,9 @@ class EmbedRank:
         selected_sent_index.append(ckpIndex2sentIndex[best_ckp_index])
         unselected_ckp.remove(best_ckp_index)
 
+        if top_n == -1:
+            top_n = len(ckp_vecs)
+            
         # do top_n - 1 cycle to select top N keywords
         while len(selected_ckp) != top_n:
             dist_to_doc = doc_ckp_sims_norm[unselected_ckp, :] # dist from ckp to doc of the unselected ckps
