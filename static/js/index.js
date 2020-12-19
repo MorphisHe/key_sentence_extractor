@@ -82,9 +82,11 @@ function handleFileSelect(e) {
       $.ajax({
         url: "/get_key_phrases",
         type: "GET",
+        cache: false,
       })
         .done((data) => {
-          $("html").html(data);
+          window.location.href = window.location.href + "get_key_phrases"
+          //$("html").html(data);
         })
     })
     .fail(() => {
