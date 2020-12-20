@@ -1441,7 +1441,7 @@ class Document:
 
         doc_name: name of current document
 
-        parse_para: default None, replace with dict to parser. refer to parse_paragraph() function for detail
+        parse_para: default None, replace with dict or True to parser. refer to parse_paragraph() function for detail
 
         process_type: ["Detection" | "Analysis"] the mode for textract response
         '''
