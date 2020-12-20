@@ -1471,6 +1471,10 @@ class Document:
         elif parse_para:
             self.parse_paragraphs()
 
+        self._text = ""
+        for page in self.doc_pages:
+            self._text += (page.text + "\n")
+
     def _organize_by_page(self, json_response_list):
         '''
         create a dict that maps page_num to all blocks that belongs to that page
@@ -1695,3 +1699,7 @@ class Document:
     @property
     def doc_name(self):
         return self._doc_name
+
+    @property
+    def text(self):
+        return self._text
