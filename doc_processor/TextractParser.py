@@ -46,7 +46,7 @@ class ResponseKeys:
     PAGES = "Pages"
 
 
-MIN_CONFIDENCE = 95.0
+MIN_CONFIDENCE = 90.0
 
 '''
 ========================================
