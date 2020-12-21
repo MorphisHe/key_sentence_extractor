@@ -19,5 +19,4 @@ This project implements EmbedRank algorithm to extract key phrases from document
 
 # TODO
     - change bottom left container to something else
-    - fix bug that pdf shower dont refresh, probably because of caches
     - not using doc_processor module due to cost of aws textract
