@@ -1,10 +1,11 @@
 from embed_rank.EmbedRank import EmbedRank
 from flask import Flask, request, render_template
+import os
 
 MODEL_PATH = "d500_w4_mc8_n9_e50.model"
 app = Flask(__name__)
 er = EmbedRank(model_path=MODEL_PATH)
-FILE_NAME = "static/temp.pdf"
+FILE_NAME = ""
 res_dict = {}
 cur_sort_mode = "rank"
 
@@ -32,6 +33,9 @@ def sort():
 @app.route("/upload_file", methods=["POST"])
 def upload_file():
     f = request.files['file']
+
+    global FILE_NAME
+    FILE_NAME = "static/"+f.filename
     f.save(FILE_NAME)
 
     global res_dict
