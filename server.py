@@ -1,4 +1,3 @@
-from six import get_function_globals
 from embed_rank.EmbedRank import EmbedRank
 from flask import Flask, request, render_template
 
@@ -15,8 +14,6 @@ def home():
 
 @app.route("/get_key_phrases", methods=["GET", "POST"])
 def get_key_phrases():
-    global res_dict
-    res_dict = embed_rank_pipline(FILE_NAME)
     return render_template("content.html", pdf_filename=FILE_NAME.split("/")[-1], data=res_dict)
 
 @app.route("/get_key_phrases/sort", methods=["GET", "POST"])
@@ -36,6 +33,9 @@ def sort():
 def upload_file():
     f = request.files['file']
     f.save(FILE_NAME)
+
+    global res_dict
+    res_dict = embed_rank_pipline(FILE_NAME)
     return "Success"
 
 def reconstructor(sent_token, selected_ckp_filtered, selected_sent_index):
