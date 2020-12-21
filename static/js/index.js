@@ -69,29 +69,13 @@ drop
 function handleFileSelect(e) {
   e.preventDefault(); // Prevent the normal form submit
   var form_data = new FormData($("#upload-file")[0]);
-  $.ajax({
-    type: "POST",
-    url: "/upload_file",
-    data: form_data,
-    contentType: false,
-    cache: false,
-    processData: false,
-  })
-    .done(() => {
-      //window.location.assign(window.location.href + "get_key_phrases");
-      $.ajax({
-        url: "/get_key_phrases",
-        type: "GET",
-        cache: false,
-      })
-        .done((data) => {
-          window.location.href = window.location.href + "get_key_phrases"
-          //$("html").html(data);
-        })
-    })
-    .fail(() => {
-      console.log("Ajax failed: " + data["responseText"]);
-    });
+
+  fetch(`${window.origin}/upload_file`, {
+    method: "POST",
+    body: form_data,
+  }).then(() => {
+    window.location.href = window.location.href + "get_key_phrases";
+  });
 }
 
 $("#upload-file").change(handleFileSelect);
