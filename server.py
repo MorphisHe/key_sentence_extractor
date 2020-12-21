@@ -11,6 +11,11 @@ cur_sort_mode = "rank"
 
 @app.route("/", methods=["GET"])
 def home():
+    # delete pdf under static folder
+    for filename in os.listdir("static"):
+        if filename.split(".")[-1] == "pdf":
+            os.remove("static/"+filename)
+
     return render_template("index.html")
 
 @app.route("/get_key_phrases", methods=["GET", "POST"])
